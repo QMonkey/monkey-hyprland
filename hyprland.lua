@@ -246,7 +246,7 @@ hl.bind(mainMod .. " + d", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + c", hl.dsp.window.close())
 hl.bind(mainMod .. " + v", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + p", hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + j", hl.dsp.layout("togglesplit"))
+hl.bind(mainMod .. " + t", hl.dsp.layout("togglesplit"))
 
 -- Fullscreen
 hl.bind(mainMod .. " + f", hl.dsp.window.fullscreen())
