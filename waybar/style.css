@@ -1,0 +1,156 @@
+/* =============================================================================
+ * Waybar Style - Sonokai Dark Theme with Transparent Blur
+ * ============================================================================= */
+
+/* Sonokai Color Variables */
+@define-color bg0 #2c2e34;
+@define-color bg1 #33353f;
+@define-color bg2 #363944;
+@define-color bg3 #3b3e48;
+@define-color fg #e2e2e3;
+@define-color red #fc5d7c;
+@define-color orange #f39660;
+@define-color yellow #e7c664;
+@define-color green #9ed072;
+@define-color blue #76cce0;
+@define-color purple #b39df3;
+@define-color grey #7f8490;
+
+/* Global Styles */
+* {
+  font-family: "JetBrains Mono", "Nerd Font", "Symbols Nerd Font", sans-serif;
+  font-size: 13px;
+  min-height: 0;
+}
+
+/* Main Bar */
+window#waybar {
+  background: rgba(44, 46, 52, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(127, 132, 144, 0.2);
+  color: @fg;
+}
+
+/* Workspaces */
+#workspaces button {
+  padding: 0 5px;
+  color: @grey;
+  background-color: transparent;
+  border-radius: 4px;
+  margin: 4px 2px;
+  border: none;
+}
+
+#workspaces button.active {
+  color: @fg;
+  background-color: @bg3;
+  border-radius: 4px;
+}
+
+#workspaces button:hover {
+  background-color: @bg2;
+  color: @fg;
+}
+
+#workspaces button.urgent {
+  color: @red;
+  background-color: rgba(252, 93, 124, 0.2);
+}
+
+/* Clock */
+#clock {
+  padding: 0 10px;
+  color: @blue;
+  font-weight: bold;
+}
+
+/* Network */
+#network {
+  padding: 0 10px;
+  color: @green;
+}
+
+#network.disconnected {
+  color: @red;
+}
+
+/* Pulseaudio */
+#pulseaudio {
+  padding: 0 10px;
+  color: @purple;
+}
+
+#pulseaudio.muted {
+  color: @grey;
+}
+
+/* Battery */
+#battery {
+  padding: 0 10px;
+  color: @green;
+}
+
+#battery.warning {
+  color: @yellow;
+}
+
+#battery.critical {
+  color: @red;
+  animation: blink 1s linear infinite;
+}
+
+@keyframes blink {
+  to {
+    color: @fg;
+  }
+}
+
+/* Tray */
+#tray {
+  padding: 0 10px;
+}
+
+#tray > pass-through {
+  background: transparent;
+}
+
+#tray > .needs-attention {
+  -gtk-icon-effect: dim;
+}
+
+#tray > .active {
+  -gtk-icon-effect: highlight;
+  background-color: @bg2;
+  border-radius: 4px;
+}
+
+/* Custom Power Button */
+#custom-power {
+  padding: 0 10px;
+  color: @red;
+  margin-right: 4px;
+}
+
+#custom-power:hover {
+  background-color: rgba(252, 93, 124, 0.2);
+  border-radius: 4px;
+}
+
+/* Tooltip */
+tooltip {
+  background-color: @bg1;
+  border: 1px solid @bg3;
+  border-radius: 6px;
+  color: @fg;
+}
+
+tooltip label {
+  color: @fg;
+  padding: 4px;
+}
+
+/* Separator */
+#custom-separator {
+  color: @grey;
+  margin: 0 4px;
+}
