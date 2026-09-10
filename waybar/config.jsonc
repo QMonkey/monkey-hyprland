@@ -17,8 +17,7 @@
     "tray",
     "network",
     "pulseaudio",
-    "battery",
-    "custom/power"
+    "battery"
   ],
   // Module configurations
   "hyprland/workspaces": {
@@ -105,14 +104,9 @@
     "tooltip-format": "{timeTo}\n{capacity}% - {power}W",
     "interval": 30
   },
-  "tray": {
+"tray": {
     "icon-size": 16,
     "spacing": 8,
     "show-passive-items": true
-  },
-  "custom/power": {
-    "format": "",
-    "on-click": "wlogout",
-    "tooltip": false
   }
 }

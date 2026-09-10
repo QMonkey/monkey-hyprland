@@ -54,6 +54,37 @@ check_bin() {
 	fi
 }
 
+# Same as check_bin but accepts multiple alternatives and falls back to
+# /usr/lib and /usr/libexec (D-Bus services such as the desktop portals and
+# polkit agents usually live outside PATH).
+check_bin_ext() {
+	local label="$1"
+	shift
+	for b in "$@"; do
+		if command -v "$b" &>/dev/null || [[ -x "/usr/lib/$b" ]] || [[ -x "/usr/libexec/$b" ]]; then
+			echo -e "  ${PASS} $label ($b)"
+			return 0
+		fi
+	done
+	echo -e "  ${FAIL} $label"
+	return 1
+}
+
+# Pure availability test used after --install: PATH or /usr/lib* lookup.
+bin_req_ok() {
+	local b="$1"
+	if [[ "$b" == "notif" ]]; then
+		command -v mako &>/dev/null && return 0
+		command -v dunst &>/dev/null && return 0
+		return 1
+	fi
+	if command -v "$b" &>/dev/null; then return 0; fi
+	for p in "/usr/lib/$b" "/usr/libexec/$b"; do
+		[[ -x "$p" ]] && return 0
+	done
+	return 1
+}
+
 os_detect() {
 	case "$(uname -s)" in
 	Linux)
@@ -108,8 +139,11 @@ get_install_hint() {
 
 # ────────────────── dependency definitions ──────────────────
 
-REQUIRED_BINS=(hyprctl waybar wezterm wofi grim slurp wl-copy wlogout wpctl)
-RECOMMENDED_BINS=(nm-applet hyprlock brightnessctl pavucontrol nm-connection-editor)
+REQUIRED_BINS=(hyprctl waybar wezterm wofi grim slurp wl-copy wlogout wpctl hyprpaper hypridle)
+# D-Bus services that may live outside PATH (/usr/lib, /usr/libexec). "notif"
+# is special: it accepts mako OR dunst (any one notification daemon).
+REQUIRED_EXT_BINS=(xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent notif)
+RECOMMENDED_BINS=(nm-applet hyprlock brightnessctl pavucontrol nm-connection-editor hyprpicker hyprsunset)
 
 # Human-readable name for a dependency binary.
 dep_name() {
@@ -122,8 +156,16 @@ dep_name() {
 	wl-copy) echo "wl-clipboard (wl-copy)" ;;
 	wlogout) echo "wlogout (power menu)" ;;
 	wpctl) echo "wireplumber (wpctl)" ;;
+	hyprpaper) echo "hyprpaper (wallpaper)" ;;
+	hypridle) echo "hypridle (idle management)" ;;
+	xdg-desktop-portal-hyprland) echo "xdg-desktop-portal-hyprland (capture/sharing portal)" ;;
+	xdg-desktop-portal-gtk) echo "xdg-desktop-portal-gtk (file-chooser portal)" ;;
+	hyprpolkitagent) echo "hyprpolkitagent (polkit auth agent)" ;;
+	notif) echo "notification daemon (mako/dunst)" ;;
 	nm-applet) echo "nm-applet (tray network manager)" ;;
 	hyprlock) echo "hyprlock (lock screen)" ;;
+	hyprpicker) echo "hyprpicker (color picker)" ;;
+	hyprsunset) echo "hyprsunset (color temperature)" ;;
 	nm-connection-editor) echo "nm-connection-editor" ;;
 	*) echo "$1" ;;
 	esac
@@ -134,6 +176,8 @@ dep_name() {
 pkg_name() {
 	local bin="$1"
 	case "$OS:$bin" in
+	# Sentinel: notification daemon — install mako by default
+	*:notif) echo "mako" ;;
 	# Debian / apt
 	debian:wl-copy) echo "wl-clipboard" ;;
 	debian:wpctl) echo "wireplumber" ;;
@@ -207,10 +251,22 @@ echo ""
 
 # ──── required tools ────
 echo -e "${BOLD}Required tools${NC}"
-echo "  (hyprland/waybar/terminal/launcher/screenshot/power menu/audio)"
+echo "  (compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle)"
 MISSING_REQUIRED=()
 for bin in "${REQUIRED_BINS[@]}"; do
 	if check_bin "$bin" "$(dep_name "$bin")"; then
+		:
+	else
+		MISSING_REQUIRED+=("$bin")
+	fi
+done
+for bin in "${REQUIRED_EXT_BINS[@]}"; do
+	if [[ "$bin" == "notif" ]]; then
+		candidates=("mako" "dunst")
+	else
+		candidates=("$bin")
+	fi
+	if check_bin_ext "$(dep_name "$bin")" "${candidates[@]}"; then
 		:
 	else
 		MISSING_REQUIRED+=("$bin")
@@ -224,8 +280,8 @@ if $INSTALL_MODE && [[ ${#MISSING_REQUIRED[@]} -gt 0 ]]; then
 	for b in "${MISSING_REQUIRED[@]}"; do pkgs+=("$(pkg_name "$b")"); done
 	if install_pkg "${pkgs[@]}"; then
 		MISSING_REQUIRED=()
-		for bin in "${REQUIRED_BINS[@]}"; do
-			if command -v "$bin" &>/dev/null; then
+		for bin in "${REQUIRED_BINS[@]}" "${REQUIRED_EXT_BINS[@]}"; do
+			if bin_req_ok "$bin"; then
 				echo -e "  ${PASS} $(dep_name "$bin") installed"
 			else
 				MISSING_REQUIRED+=("$bin")
@@ -235,7 +291,7 @@ if $INSTALL_MODE && [[ ${#MISSING_REQUIRED[@]} -gt 0 ]]; then
 		if [[ ${#MISSING_REQUIRED[@]} -eq 0 ]]; then
 			echo -e "${GREEN}All required tools now available.${NC}"
 		else
-			echo -e "${RED}Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock)${NC}"
+			echo -e "${RED}Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock), xdg-desktop-portal-hyprland, hyprpolkitagent, hyprpaper, hypridle (on Arch all of these are in the official repo)${NC}"
 		fi
 	else
 		echo -e "${RED}Install command failed. Run: $(get_install_hint "${pkgs[*]}")${NC}"

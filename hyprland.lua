@@ -1,34 +1,39 @@
 -- =============================================================================
 -- Hyprland Lua Configuration
 -- Sonokai Dark Theme | Vim-style Keybindings | Auto Monitor Detection
+-- Requires Hyprland >= 0.55 (Lua config support)
 -- =============================================================================
 
--- Sonokai Default Style Colors
+-- -----------------------------------------------------------------------------
+-- Sonokai Default Style Colors (rgba format: rrggbbaa)
+-- -----------------------------------------------------------------------------
 local colors = {
-  black     = '#181819',
-  bg_dim    = '#222327',
-  bg0       = '#2c2e34',
-  bg1       = '#33353f',
-  bg2       = '#363944',
-  bg3       = '#3b3e48',
-  bg4       = '#414550',
-  bg_red    = '#55393d',
-  bg_yellow = '#4e432f',
-  bg_green  = '#394634',
-  bg_blue   = '#354157',
-  bg_purple = '#434055',
-  fg        = '#e2e2e3',
-  red       = '#fc5d7c',
-  orange    = '#f39660',
-  yellow    = '#e7c664',
-  green     = '#9ed072',
-  blue      = '#76cce0',
-  purple    = '#b39df3',
-  grey      = '#7f8490',
-  grey_dim  = '#595f6f',
+  black     = "rgba(181819ff)",
+  bg_dim    = "rgba(222327ff)",
+  bg0       = "rgba(2c2e34ff)",
+  bg1       = "rgba(33353fff)",
+  bg2       = "rgba(363944ff)",
+  bg3       = "rgba(3b3e48ff)",
+  bg4       = "rgba(414550ff)",
+  bg_red    = "rgba(55393dff)",
+  bg_yellow = "rgba(4e432fff)",
+  bg_green  = "rgba(394634ff)",
+  bg_blue   = "rgba(354157ff)",
+  bg_purple = "rgba(434055ff)",
+  fg        = "rgba(e2e2e3ff)",
+  red       = "rgba(fc5d7cff)",
+  orange    = "rgba(f39660ff)",
+  yellow    = "rgba(e7c664ff)",
+  green     = "rgba(9ed072ff)",
+  blue      = "rgba(76cce0ff)",
+  purple    = "rgba(b39df3ff)",
+  grey      = "rgba(7f8490ff)",
+  grey_dim  = "rgba(595f6faa)",
 }
 
--- Detect if running on laptop (has battery)
+-- -----------------------------------------------------------------------------
+-- Device detection: laptop has a battery; desktop does not
+-- -----------------------------------------------------------------------------
 local function is_laptop()
   local handle = io.popen("ls /sys/class/power_supply/ 2>/dev/null | grep -i bat")
   if handle then
@@ -39,16 +44,41 @@ local function is_laptop()
   return false
 end
 
-local laptop = is_laptop()
+local laptop     = is_laptop()
 
+-- -----------------------------------------------------------------------------
 -- Programs
-local terminal = "wezterm"
-local menu = "wofi --show drun"
+-- -----------------------------------------------------------------------------
+local terminal   = "wezterm"
+local menu       = "wofi --show drun"
 
--- =============================================================================
+-- Volume cap: 1.0 = 100%, 1.5 = 150%. Set to nil to allow unlimited.
+local volume_cap = 1.5
+
+-- -----------------------------------------------------------------------------
+-- ENVIRONMENT VARIABLES
+-- -----------------------------------------------------------------------------
+hl.env("XCURSOR_SIZE", "24")
+hl.env("HYPRCURSOR_SIZE", "24")
+-- Required portal behavior depends on these three
+hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
+hl.env("XDG_SESSION_TYPE", "wayland")
+hl.env("XDG_SESSION_DESKTOP", "Hyprland")
+-- Qt: force Wayland so Qt apps don't fall back to blurry XWayland
+hl.env("QT_QPA_PLATFORM", "wayland;xcb")
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
+hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+-- GTK / Electron
+hl.env("GDK_BACKEND", "wayland,x11")
+hl.env("GDK_DPI_SCALE", "1")
+hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+hl.env("NIXOS_OZONE_WL", "1")
+
+-- -----------------------------------------------------------------------------
 -- MONITORS
--- Auto-detect monitors, use high refresh rate
--- =============================================================================
+-- Auto-detect every monitor at its highest refresh rate,
+-- secondary monitors use their own workspaces (extended desktop).
+-- -----------------------------------------------------------------------------
 hl.monitor({
   output   = "",
   mode     = "highrr",
@@ -56,29 +86,32 @@ hl.monitor({
   scale    = "auto",
 })
 
--- =============================================================================
--- ENVIRONMENT VARIABLES
--- =============================================================================
-hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_SIZE", "24")
-hl.env("QT_QPA_PLATFORM", "wayland")
-hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
-hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
-hl.env("XDG_SESSION_TYPE", "wayland")
-hl.env("GDK_BACKEND", "wayland,x11")
-
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- AUTOSTART
--- =============================================================================
+-- Copied-by-example warning: this is a hand-written config, no autogenerated
+-- flag is set, so no yellow warning bar is shown.
+-- -----------------------------------------------------------------------------
 hl.on("hyprland.start", function()
-  hl.exec_cmd("waybar &")
-  -- Only start nm-applet if network manager is available
+  -- Status bar (login-start, keep it running)
+  hl.exec_cmd("pgrep -x waybar || waybar &")
+  -- Notification daemon (required by waybar notification modules)
+  hl.exec_cmd("pgrep -x mako || mako &")
+  -- Polkit authentication agent (GUI privilege prompts)
+  hl.exec_cmd("pgrep -x hyprpolkitagent || hyprpolkitagent &")
+  -- XDG Desktop Portal (screenshot/screen-share is Hyprland's backend,
+  -- file chooser still needs the gtk portal to coexist)
+  hl.exec_cmd("pgrep -x xdg-desktop-portal-hyprland || /usr/lib/xdg-desktop-portal-hyprland &")
+  -- Idle daemon (auto suspend/lock)
+  hl.exec_cmd("pgrep -x hypridle || hypridle &")
+  -- Wallpaper
+  hl.exec_cmd("pgrep -x hyprpaper || hyprpaper &")
+  -- Network manager applet
   hl.exec_cmd("pgrep -x nm-applet || nm-applet &")
 end)
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- GENERAL
--- =============================================================================
+-- -----------------------------------------------------------------------------
 hl.config({
   general = {
     gaps_in          = 3,
@@ -94,9 +127,9 @@ hl.config({
   },
 })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- DECORATION
--- =============================================================================
+-- -----------------------------------------------------------------------------
 hl.config({
   decoration = {
     rounding         = 6,
@@ -108,7 +141,7 @@ hl.config({
       enabled      = true,
       range        = 4,
       render_power = 3,
-      color        = "0x66000000",
+      color        = 0x66000000, -- AARRGGBB
     },
 
     blur             = {
@@ -120,18 +153,18 @@ hl.config({
   },
 })
 
--- =============================================================================
--- ANIMATIONS (Minimal for performance)
--- =============================================================================
+-- -----------------------------------------------------------------------------
+-- ANIMATIONS (minimal, performance-first)
+-- -----------------------------------------------------------------------------
 hl.config({
   animations = {
     enabled = false,
   },
 })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- INPUT
--- =============================================================================
+-- -----------------------------------------------------------------------------
 hl.config({
   input = {
     kb_layout     = "us",
@@ -144,9 +177,9 @@ hl.config({
   },
 })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- LAYOUTS
--- =============================================================================
+-- -----------------------------------------------------------------------------
 hl.config({
   dwindle = {
     preserve_split = true,
@@ -158,9 +191,9 @@ hl.config({
   },
 })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- MISC
--- =============================================================================
+-- -----------------------------------------------------------------------------
 hl.config({
   misc = {
     force_default_wallpaper     = 0,
@@ -173,9 +206,9 @@ hl.config({
   },
 })
 
--- =============================================================================
--- GESTURES (for touchpad laptops)
--- =============================================================================
+-- -----------------------------------------------------------------------------
+-- GESTURES (touchpad laptop only)
+-- -----------------------------------------------------------------------------
 if laptop then
   hl.gesture({
     fingers   = 3,
@@ -184,48 +217,48 @@ if laptop then
   })
 end
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- KEYBINDINGS
--- =============================================================================
+-- -----------------------------------------------------------------------------
 local mainMod = "SUPER"
 
--- Window Focus (Vim-style navigation)
+-- Window focus (Vim-style)
 hl.bind(mainMod .. " + h", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + j", hl.dsp.focus({ direction = "down" }))
 hl.bind(mainMod .. " + k", hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + l", hl.dsp.focus({ direction = "right" }))
 
--- Move Windows (Super+Ctrl+HJKL)
+-- Move windows (Super+Ctrl+HJKL)
 hl.bind(mainMod .. " + CTRL + h", hl.dsp.window.move({ direction = "left" }))
 hl.bind(mainMod .. " + CTRL + j", hl.dsp.window.move({ direction = "down" }))
 hl.bind(mainMod .. " + CTRL + k", hl.dsp.window.move({ direction = "up" }))
 hl.bind(mainMod .. " + CTRL + l", hl.dsp.window.move({ direction = "right" }))
 
--- Resize Windows (Super+Shift+HJKL)
+-- Resize windows (Super+Shift+HJKL)
 hl.bind(mainMod .. " + SHIFT + h", hl.dsp.window.resize({ direction = "left" }))
 hl.bind(mainMod .. " + SHIFT + j", hl.dsp.window.resize({ direction = "down" }))
 hl.bind(mainMod .. " + SHIFT + k", hl.dsp.window.resize({ direction = "up" }))
 hl.bind(mainMod .. " + SHIFT + l", hl.dsp.window.resize({ direction = "right" }))
 
--- Arrow key alternatives for window focus
+-- Arrow key alternatives for focus
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up", hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down", hl.dsp.focus({ direction = "down" }))
 
--- Arrow key alternatives for moving windows
+-- Arrow key alternatives for move
 hl.bind(mainMod .. " + CTRL + left", hl.dsp.window.move({ direction = "left" }))
 hl.bind(mainMod .. " + CTRL + right", hl.dsp.window.move({ direction = "right" }))
 hl.bind(mainMod .. " + CTRL + up", hl.dsp.window.move({ direction = "up" }))
 hl.bind(mainMod .. " + CTRL + down", hl.dsp.window.move({ direction = "down" }))
 
--- Arrow key alternatives for resizing windows
+-- Arrow key alternatives for resize
 hl.bind(mainMod .. " + SHIFT + left", hl.dsp.window.resize({ direction = "left" }))
 hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.resize({ direction = "right" }))
 hl.bind(mainMod .. " + SHIFT + up", hl.dsp.window.resize({ direction = "up" }))
 hl.bind(mainMod .. " + SHIFT + down", hl.dsp.window.resize({ direction = "down" }))
 
--- Workspaces (Super + 1-9)
+-- Workspace switch (Super + 1-9) and move-to-workspace (Super+Shift+1-9)
 for i = 1, 9 do
   local key = i % 10
   hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
@@ -236,7 +269,7 @@ end
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 
--- Special workspace (scratchpad)
+-- Special (scratchpad) workspace
 hl.bind(mainMod .. " + S", hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
@@ -252,9 +285,9 @@ hl.bind(mainMod .. " + t", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + f", hl.dsp.window.fullscreen())
 
 -- Pin window
-hl.bind(mainMod .. " + Ctrl + p", hl.dsp.window.pin())
+hl.bind(mainMod .. " + CTRL + p", hl.dsp.window.pin())
 
--- Move active window to next/prev monitor
+-- Monitor navigation
 hl.bind(mainMod .. " + bracketleft", hl.dsp.focus({ monitor = "e-1" }))
 hl.bind(mainMod .. " + bracketright", hl.dsp.focus({ monitor = "e+1" }))
 hl.bind(mainMod .. " + SHIFT + bracketleft", hl.dsp.window.move({ monitor = "e-1" }))
@@ -264,14 +297,15 @@ hl.bind(mainMod .. " + SHIFT + bracketright", hl.dsp.window.move({ monitor = "e+
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Exit
+-- Exit (minimal philosophy: no wlogout, one hotkey)
 hl.bind(mainMod .. " + SHIFT + e", hl.dsp.exit())
 
--- Lock screen (if hyprlock is installed)
+-- Lock screen (hyprlock)
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
 
--- Laptop multimedia keys
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
+-- Media keys (volume, no hard-coded 100% cap)
+local vol_cap_arg = volume_cap and ("-l " .. volume_cap) or ""
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume " .. vol_cap_arg .. " @DEFAULT_AUDIO_SINK@ 5%+"),
   { locked = true, repeating = true })
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),
   { locked = true, repeating = true })
@@ -280,28 +314,28 @@ hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ to
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
   { locked = true, repeating = true })
 
--- Brightness control (laptop only)
+-- Brightness (laptop only)
 if laptop then
   hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), { locked = true, repeating = true })
   hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), { locked = true, repeating = true })
 end
 
--- Screenshot
-hl.bind(mainMod .. " + ,", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
-hl.bind(mainMod .. " + SHIFT + ,", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
+-- Screenshots (require grim + slurp + wl-clipboard)
+hl.bind(",", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
+hl.bind("SHIFT + ,", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- WINDOW RULES
--- =============================================================================
+-- -----------------------------------------------------------------------------
 
--- Suppress maximize events (prevents bugs)
+-- Suppress maximize events from apps (avoids layout bugs)
 hl.window_rule({
   name           = "suppress-maximize",
   match          = { class = ".*" },
   suppress_event = "maximize",
 })
 
--- Fix XWayland dragging issues
+-- Fix XWayland drag regressions
 hl.window_rule({
   name     = "fix-xwayland-drags",
   match    = {
@@ -315,7 +349,7 @@ hl.window_rule({
   no_focus = true,
 })
 
--- Float rules for small tools
+-- Float rules for small tools (everything else stays fully tiled)
 local float_tools = {
   "Calculator",
   "gnome-calendar",
@@ -331,7 +365,6 @@ local float_tools = {
   "gcr-prompter",
   "gnome-shell",
   "kleo",
-  "nm-connection-editor",
   "org.gnome.Settings",
   "org.gnome.tweaks",
   "pwvucontrol",
@@ -355,7 +388,7 @@ for _, class in ipairs(float_tools) do
   })
 end
 
--- Float for specific titles
+-- Float + pin for picture-in-picture
 hl.window_rule({
   name   = "float-picture-in-picture",
   match  = { title = "Picture-in-Picture" },
@@ -364,6 +397,7 @@ hl.window_rule({
   on_top = true,
 })
 
+-- Float + center for file progress dialogs
 hl.window_rule({
   name   = "float-file-progress",
   match  = { title = "File Operation Progress" },
@@ -371,7 +405,7 @@ hl.window_rule({
   center = true,
 })
 
--- Opacity rules for specific apps
+-- Terminal opacity
 hl.window_rule({
   name             = "opacity-terminal",
   match            = { class = "^(Alacritty|kitty|wezterm|foot|ghostty)$" },
@@ -379,13 +413,14 @@ hl.window_rule({
   inactive_opacity = 0.95,
 })
 
--- Layer rules for waybar
+-- Blur behind waybar
 hl.layer_rule({
   name  = "waybar",
   match = { namespace = "waybar" },
   blur  = true,
 })
 
--- =============================================================================
+-- -----------------------------------------------------------------------------
 -- END OF CONFIG
--- =============================================================================
+-- -----------------------------------------------------------------------------
+
