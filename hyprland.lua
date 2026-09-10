@@ -287,8 +287,8 @@ if laptop then
 end
 
 -- Screenshot
-hl.bind(",", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
-hl.bind("SHIFT + ,", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
+hl.bind(mainMod .. " + ,", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
+hl.bind(mainMod .. " + SHIFT + ,", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
 
 -- =============================================================================
 -- WINDOW RULES
