@@ -9,7 +9,7 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | Feature             | Description                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------- |
 | Lua config          | Written in pure Lua against Hyprland's native `hl` API — no hyprlang fragments      |
-| Sonokai theme       | Colors matched to the sonokai dark scheme (same palette as monkey-vim)              |
+| Sonokai theme       | Colors matched to the sonokai dark scheme                                           |
 | Vim-style bindings  | Focus / move / resize windows with `Super + Ctrl/Shift + h/j/k/l`                   |
 | Auto monitor detect | Monitors are auto-detected with `highrr` mode and auto scale/position               |
 | Laptop aware        | Touchpad gestures and brightness keys are enabled automatically on battery machines |
