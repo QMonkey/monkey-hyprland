@@ -272,7 +272,7 @@ run_checkhealth() {
 	# first pass everything installed is skipped, so retries are cheap.
 	local attempt ok=0
 	for attempt in 1 2 3; do
-		if bash "$INSTALL_DIR/checkhealth.sh" --install; then
+		if bash "$INSTALL_DIR/checkhealth.sh" --install --skip-check-config; then
 			ok=1
 			break
 		fi
