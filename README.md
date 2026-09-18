@@ -28,6 +28,10 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 
 ### 1. Install dependencies
 
+`install.sh` and `checkhealth.sh --install` install these automatically (apt/zypper/dnf/pacman). The tables below document what gets checked and why:
+
+> On Arch all required tools are in the official repos. On Debian/openSUSE/CentOS some tools (wezterm, hyprlock, xdg-desktop-portal-hyprland, hyprpolkitagent) may need a manual install or a source build — checkhealth reports each one.
+
 #### Common tools
 
 | Tool                                        | Purpose                                                                   | Required |
@@ -103,10 +107,30 @@ Pass `--install` to automatically install missing dependencies. Supports apt/zyp
 
 ### 3. Install monkey-hyprland
 
+One-liner (installs deps, clones this repo and links the configs):
+
 ```bash
+curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash
+```
+
+The installer also writes a **guarded tty1 autostart block** to your shell rc (`~/.zshrc` / `~/.bashrc`) when the machine has no graphical session, no display manager and no other desktop running:
+
+```bash
+# monkey-hyprland autostart (remove these lines to disable)
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+    exec Hyprland
+fi
+```
+
+> If the install was chained from an outer meta-installer, its terminal-activation step may `source` your rc file right after the install — on a tty1 bash machine (where `.bash_profile` sources `.bashrc`) this can start the compositor immediately.
+
+Prefer manual setup? Clone and link:
+
+```bash
+git clone https://github.com/QMonkey/monkey-hyprland.git
 cd monkey-hyprland
-ln -sf $(pwd)/hyprland.lua ~/.config/hypr/hyprland.lua
-ln -sf $(pwd)/waybar ~/.config/waybar
+ln -sfn $(pwd)/hyprland.lua ~/.config/hypr/hyprland.lua
+ln -sfn $(pwd)/waybar ~/.config/waybar
 ```
 
 Then start (or restart) Hyprland. waybar and nm-applet are launched automatically on startup.
@@ -124,6 +148,8 @@ Hyprland
 Never run it under `sudo`/`root`. If the session ends (Super+Shift+e), you are dropped back to the TTY.
 
 #### Auto-start on boot
+
+`install.sh` writes the block below for you when it detects a bare-TTY machine (no graphical session, no display manager, no other desktop). To add it manually:
 
 Add the following to your shell rc file (`~/.zshrc` or `~/.bashrc`):
 
