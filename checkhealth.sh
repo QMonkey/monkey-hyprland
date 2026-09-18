@@ -14,6 +14,7 @@ WARN="[${YELLOW}!${NC}]"
 
 ALL_PASSED=true
 INSTALL_MODE=false
+SKIP_CONFIG_CHECKS=false
 
 usage() {
 	cat <<EOF
@@ -23,6 +24,9 @@ Check and optionally install dependencies for monkey-hyprland.
 
 OPTIONS
   -i, --install    Install missing dependencies
+  --skip-check-config
+                   Skip config-file checks (install.sh passes this: the
+                   config symlinks are linked after this script runs)
   -h, --help       Show this help
 
 Exit code: 1 if any required dependency is missing, 0 otherwise.
@@ -34,6 +38,7 @@ parse_args() {
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		-i | --install) INSTALL_MODE=true ;;
+		--skip-check-config) SKIP_CONFIG_CHECKS=true ;;
 		-h | --help) usage ;;
 		*)
 			echo "Unknown option: $1"
@@ -172,20 +177,23 @@ refresh_pkg() {
 install_pkg() {
 	if ! $INSTALL_MODE; then return 1; fi
 	refresh_pkg
+	local _rc=0
 	case "$OS" in
-	debian) sudo_cmd apt-get install -y "$@" ;;
-	arch) sudo_cmd pacman -S --noconfirm "$@" ;;
-	opensuse) sudo_cmd zypper --non-interactive install -y "$@" ;;
+	debian) sudo_cmd apt-get install -y "$@" || _rc=1 ;;
+	arch) sudo_cmd pacman -S --noconfirm "$@" || _rc=1 ;;
+	opensuse) sudo_cmd zypper --non-interactive install -y "$@" || _rc=1 ;;
 	centos)
 		# Some of the tools come from EPEL on the RHEL/Fedora family.
 		sudo_cmd dnf install -y epel-release || true
-		sudo_cmd dnf install -y "$@"
+		sudo_cmd dnf install -y "$@" || _rc=1
 		;;
 	*) return 1 ;;
 	esac
 	# Re-scan PATH: fresh binaries must not be shadowed by bash's
-	# per-process command hash cache.
+	# per-process command hash cache. Run AFTER capturing _rc — hash -r
+	# must not mask the install status.
 	hash -r
+	return "$_rc"
 }
 
 get_install_hint() {
@@ -413,6 +421,14 @@ check_fonts() {
 }
 
 check_config_files() {
+	# --skip-check-config (passed by install.sh): the config symlinks are
+	# linked AFTER this script runs, so judging them here would fail every
+	# chained run and burn all three retries. Standalone runs (the manual
+	# diagnosis entry point) still get the full check.
+	if $SKIP_CONFIG_CHECKS; then
+		echo -e "  ${WARN} config checks skipped (handled by the installer)"
+		return 0
+	fi
 	echo -e "${BOLD}Config files${NC}"
 	local script_dir
 	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
