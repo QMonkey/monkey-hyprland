@@ -382,7 +382,10 @@ setup_symlinks() {
 	info "Setting up configuration symlinks..."
 	mkdir -p "$HOME/.config/hypr"
 	link_config "$INSTALL_DIR/hyprland.lua" "$HOME/.config/hypr/hyprland.lua"
+	link_config "$INSTALL_DIR/hyprlock.conf" "$HOME/.config/hypr/hyprlock.conf"
+	link_config "$INSTALL_DIR/hypridle.conf" "$HOME/.config/hypr/hypridle.conf"
 	link_config "$INSTALL_DIR/waybar" "$HOME/.config/waybar"
+	link_config "$INSTALL_DIR/wlogout" "$HOME/.config/wlogout"
 }
 
 # ──────────────────── main ────────────────────
