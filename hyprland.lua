@@ -55,11 +55,22 @@ local menu       = "wofi --show drun"
 -- Volume cap: 1.0 = 100%, 1.5 = 150%. Set to nil to allow unlimited.
 local volume_cap = 1.5
 
+-- Monitor scale override. "auto" guesses from the EDID physical size and can
+-- over-amplify (e.g. remote/VM/headless displays that report a small panel).
+-- Set it to 1.0 to force native pixel size, or 2.0 for HiDPI.
+local scale      = 1.0
+
+-- Mode selection. "preferred" = the panel's EDID native mode (e.g. 1920x1080).
+-- Do NOT use "highrr" for auto-detection: it picks the single highest refresh
+-- rate across all resolutions (e.g. 1024x768@75Hz on a 1920x1080@60 monitor),
+-- which renders the desktop drastically oversized.
+local mode       = "preferred"
+
 -- -----------------------------------------------------------------------------
 -- ENVIRONMENT VARIABLES
 -- -----------------------------------------------------------------------------
-hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("XCURSOR_SIZE", "18")
+hl.env("HYPRCURSOR_SIZE", "18")
 -- Required portal behavior depends on these three
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
@@ -69,6 +80,9 @@ hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
 -- GTK / Electron
+hl.env("GTK_IM_MODULE", "fcitx")
+hl.env("QT_IM_MODULE", "fcitx")
+hl.env("XMODIFIERS", "@im=fcitx")
 hl.env("GDK_BACKEND", "wayland,x11")
 hl.env("GDK_DPI_SCALE", "1")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
@@ -81,9 +95,9 @@ hl.env("NIXOS_OZONE_WL", "1")
 -- -----------------------------------------------------------------------------
 hl.monitor({
   output   = "",
-  mode     = "highrr",
+  mode     = mode,
   position = "auto",
-  scale    = "auto",
+  scale    = tostring(scale),
 })
 
 -- -----------------------------------------------------------------------------
@@ -107,6 +121,8 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("pgrep -x hyprpaper || hyprpaper &")
   -- Network manager applet
   hl.exec_cmd("pgrep -x nm-applet || nm-applet &")
+  -- Input method (fcitx5)
+  hl.exec_cmd("pgrep -x fcitx5 || fcitx5 &")
 end)
 
 -- -----------------------------------------------------------------------------
@@ -196,13 +212,11 @@ hl.config({
 -- -----------------------------------------------------------------------------
 hl.config({
   misc = {
-    force_default_wallpaper     = 0,
-    disable_hyprland_logo       = true,
-    disable_splash_rendering    = true,
-    mouse_move_enables_dpms     = true,
-    key_press_enables_dpms      = true,
-    save_window_size            = true,
-    allow_parent_footer_closing = false,
+    force_default_wallpaper  = 0,
+    disable_hyprland_logo    = true,
+    disable_splash_rendering = true,
+    mouse_move_enables_dpms  = true,
+    key_press_enables_dpms   = true,
   },
 })
 
@@ -235,10 +249,10 @@ hl.bind(mainMod .. " + CTRL + k", hl.dsp.window.move({ direction = "up" }))
 hl.bind(mainMod .. " + CTRL + l", hl.dsp.window.move({ direction = "right" }))
 
 -- Resize windows (Super+Shift+HJKL)
-hl.bind(mainMod .. " + SHIFT + h", hl.dsp.window.resize({ direction = "left" }))
-hl.bind(mainMod .. " + SHIFT + j", hl.dsp.window.resize({ direction = "down" }))
-hl.bind(mainMod .. " + SHIFT + k", hl.dsp.window.resize({ direction = "up" }))
-hl.bind(mainMod .. " + SHIFT + l", hl.dsp.window.resize({ direction = "right" }))
+hl.bind(mainMod .. " + SHIFT + h", hl.dsp.window.resize({ x = -20, y = 0, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + j", hl.dsp.window.resize({ x = 0, y = 20, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + k", hl.dsp.window.resize({ x = 0, y = -20, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + l", hl.dsp.window.resize({ x = 20, y = 0, relative = true }), { repeating = true })
 
 -- Arrow key alternatives for focus
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
@@ -253,10 +267,10 @@ hl.bind(mainMod .. " + CTRL + up", hl.dsp.window.move({ direction = "up" }))
 hl.bind(mainMod .. " + CTRL + down", hl.dsp.window.move({ direction = "down" }))
 
 -- Arrow key alternatives for resize
-hl.bind(mainMod .. " + SHIFT + left", hl.dsp.window.resize({ direction = "left" }))
-hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.resize({ direction = "right" }))
-hl.bind(mainMod .. " + SHIFT + up", hl.dsp.window.resize({ direction = "up" }))
-hl.bind(mainMod .. " + SHIFT + down", hl.dsp.window.resize({ direction = "down" }))
+hl.bind(mainMod .. " + SHIFT + left", hl.dsp.window.resize({ x = -20, y = 0, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.resize({ x = 20, y = 0, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + up", hl.dsp.window.resize({ x = 0, y = -20, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + SHIFT + down", hl.dsp.window.resize({ x = 0, y = 20, relative = true }), { repeating = true })
 
 -- Workspace switch (Super + 1-9) and move-to-workspace (Super+Shift+1-9)
 for i = 1, 9 do
@@ -276,6 +290,7 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:mag
 -- Applications
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + d", hl.dsp.exec_cmd(menu))
+hl.bind(mainMod .. " + r", hl.dsp.exec_cmd("wofi --show run"), { locked = true })
 hl.bind(mainMod .. " + c", hl.dsp.window.close())
 hl.bind(mainMod .. " + v", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + p", hl.dsp.window.pseudo())
@@ -297,8 +312,8 @@ hl.bind(mainMod .. " + SHIFT + bracketright", hl.dsp.window.move({ monitor = "e+
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Exit (minimal philosophy: no wlogout, one hotkey)
-hl.bind(mainMod .. " + SHIFT + e", hl.dsp.exit())
+-- Exit/power menu (wlogout; keys l/e/o/r/s/h, Esc cancels; -s shows the keybinds)
+hl.bind(mainMod .. " + SHIFT + e", hl.dsp.exec_cmd("wlogout -s"))
 
 -- Lock screen (hyprlock)
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
@@ -321,8 +336,8 @@ if laptop then
 end
 
 -- Screenshots (require grim + slurp + wl-clipboard)
-hl.bind(",", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
-hl.bind("SHIFT + ,", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
+hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"), { locked = true })
+hl.bind(mainMod .. " + SHIFT + comma", hl.dsp.exec_cmd("grim - | wl-copy"), { locked = true })
 
 -- -----------------------------------------------------------------------------
 -- WINDOW RULES
@@ -390,11 +405,18 @@ end
 
 -- Float + pin for picture-in-picture
 hl.window_rule({
-  name   = "float-picture-in-picture",
-  match  = { title = "Picture-in-Picture" },
-  float  = true,
-  pin    = true,
-  on_top = true,
+  name  = "float-picture-in-picture",
+  match = { title = "Picture-in-Picture" },
+  float = true,
+  pin   = true,
+})
+
+-- GTK CSD dialogs draw their own frame — drop Hyprland's decorations so the
+-- two don't overlap/misalign (zenity question dialogs etc.)
+hl.window_rule({
+  name     = "plain-csd-dialogs",
+  match    = { class = "^zenity$" },
+  decorate = false,
 })
 
 -- Float + center for file progress dialogs
@@ -407,10 +429,9 @@ hl.window_rule({
 
 -- Terminal opacity
 hl.window_rule({
-  name             = "opacity-terminal",
-  match            = { class = "^(Alacritty|kitty|wezterm|foot|ghostty)$" },
-  active_opacity   = 1.0,
-  inactive_opacity = 0.95,
+  name    = "opacity-terminal",
+  match   = { class = "^(Alacritty|kitty|wezterm|foot|ghostty)$" },
+  opacity = "1.0 0.95",
 })
 
 -- Blur behind waybar
@@ -423,4 +444,3 @@ hl.layer_rule({
 -- -----------------------------------------------------------------------------
 -- END OF CONFIG
 -- -----------------------------------------------------------------------------
-
