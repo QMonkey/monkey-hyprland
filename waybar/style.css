@@ -26,7 +26,9 @@
 /* Main Bar */
 window#waybar {
   background: rgba(44, 46, 52, 0.85);
-  backdrop-filter: blur(10px);
+  /* backdrop-filter was added after openSUSE's GTK3 waybar — the property
+     name is rejected by this build (logs "not a valid property name").
+     bg-alpha 0.85 already provides translucency; blur is optional here. */
   border-bottom: 1px solid rgba(127, 132, 144, 0.2);
   color: @fg;
 }
