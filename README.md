@@ -128,7 +128,7 @@ The installer also writes a **guarded tty1 autostart block** to your shell rc (`
 ```bash
 # monkey-hyprland autostart (remove these lines to disable)
 if [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
-    exec Hyprland
+    exec start-hyprland   # or: exec Hyprland (older builds without the watchdog launcher)
 fi
 ```
 
@@ -155,10 +155,39 @@ Then start (or restart) Hyprland. waybar, nm-applet and fcitx5 are launched auto
 Log in on a TTY (Ctrl+Alt+F1~F6), make sure you are not root, and run:
 
 ```bash
-Hyprland
+start-hyprland
 ```
 
-Never run it under `sudo`/`root`. If the session ends (Super+Shift+e), you are dropped back to the TTY.
+`start-hyprland` is the officially recommended launcher shipped with recent Hyprland builds — a watchdog process that wraps Hyprland and restarts it after an unclean exit (crash), with a safe-mode path for persistent crashes. Arguments after `--` are passed to Hyprland itself (`start-hyprland -- -h` for Hyprland's flags).
+
+On older builds without `start-hyprland`, run `Hyprland` directly — still fully supported.
+
+Never run either under `sudo`/`root`. If the session ends (Super+Shift+e), you are dropped back to the TTY.
+
+#### Alongside an existing desktop (display manager)
+
+If another desktop environment is already installed (started by GDM, SDDM, etc.), there are two ways to get into Hyprland:
+
+**Via the display manager** — log out to the login screen and pick Hyprland from the session menu. Hyprland ships its own desktop entry in `/usr/share/wayland-sessions/`; if it is missing, create it:
+
+```ini
+# /usr/share/wayland-sessions/hyprland.desktop
+[Desktop Entry]
+Name=Hyprland
+Comment=An intelligent dynamic tiling Wayland compositor
+Exec=Hyprland
+Type=Application
+```
+
+**From a TTY** (recommended when the DM handles non-default sessions poorly) — log out (the DM returns to its greeter on its own VT), switch to a free virtual console (`Ctrl+Alt+F2`~`F6`), log in and launch Hyprland directly:
+
+```bash
+start-hyprland                        # or: Hyprland on older builds
+```
+
+No need to stop the display manager: logind hands the seat (DRM master + input devices) to whichever VT session is active, and the parked greeter is harmless. Optionally stop it first (`sudo systemctl stop display-manager`) to free its resources; this is a per-boot change and the DM comes back on reboot (`sudo systemctl disable display-manager.service` makes TTY launch permanent).
+
+> Stopping the DM terminates every session it manages — save unsaved work first. Also avoid running two compositors side by side on the same seat; concurrent sessions fight over the GPU and input devices. Log out before starting Hyprland from a TTY.
 
 #### Auto-start on boot
 
@@ -169,16 +198,47 @@ Add the following to your shell rc file (`~/.zshrc` or `~/.bashrc`):
 ```bash
 # Start Hyprland on tty1 login only, and only outside of an existing session
 if [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
-    exec Hyprland
+    exec start-hyprland
 fi
 ```
 
+- The installer picks `start-hyprland` when present, `Hyprland` otherwise.
 - `XDG_VTNR=1` limits auto-start to tty1; log in on tty2 to get a plain shell.
-- `exec` replaces the shell with Hyprland so logging out of Hyprland returns you to the login prompt.
+- `exec` replaces the shell with the launcher so logging out of Hyprland returns you to the login prompt. With the `start-hyprland` watchdog, a crash restarts the session instead.
 
 Restart, log in on tty1, and Hyprland starts automatically.
 
-> [uwsm](https://github.com/Vladimir-csp/uwsm) is a more thorough alternative (proper systemd session units, better cleanup). If installed, replace `exec Hyprland` with `exec uwsm start -- Hyprland`.
+#### Starting Hyprland from inside tmux
+
+If tmux auto-starts on shell login (e.g. from your shell rc), you may land in
+tmux first on a bare TTY — and if you then start Hyprland (manually or via the
+auto-start block above), the compositor runs inside a tmux pane with the tmux
+server as its ancestor. Restarting the tmux server (`tmux kill-server`, config
+upgrades, etc.) tears down every pane process with it, taking the desktop down
+with the session.
+
+Whether Hyprland survives a server restart depends on how it was launched
+(verified empirically):
+
+| Launch command            | Survives `tmux kill-server`?                                 |
+| ------------------------- | ------------------------------------------------------------ |
+| `start-hyprland`          | No                                                           |
+| `start-hyprland &`        | No — the pane shell forwards SIGHUP to its jobs when it dies |
+| `nohup start-hyprland &`  | Yes                                                          |
+| `setsid start-hyprland &` | Yes (recommended)                                            |
+
+- `nohup ... &` makes the process ignore SIGHUP; output is redirected to `nohup.out`.
+- `setsid ... &` is the most robust: the process moves into a brand-new
+  session with no controlling terminal at all, so no HUP can ever reach it.
+
+`setsid start-hyprland &` keeps the officially recommended "run it directly"
+semantics intact — logind still hands over the seat and Hyprland still starts
+its own session target; only HUP immunity is added. Two things to know:
+
+- The desktop inherits the environment of the tmux pane it was started from.
+- Exiting Hyprland (Super+Shift+e) drops you back into the tmux pane's shell
+  prompt rather than the login prompt, because the `exec` in the auto-start
+  block no longer applies.
 
 ### 5. Update project
 
