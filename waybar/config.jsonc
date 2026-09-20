@@ -27,15 +27,15 @@
       "default": ""
     },
     "on-click": "activate",
-    "on-scroll-up": "hyprctl dispatch workspace e+1",
-    "on-scroll-down": "hyprctl dispatch workspace e-1",
+    "on-scroll-up": "hyprctl dispatch hl.dsp.focus({workspace='e+1'})",
+    "on-scroll-down": "hyprctl dispatch hl.dsp.focus({workspace='e-1'})",
     "all-outputs": false,
     "sort-by-number": true,
     "active-only": false,
     "persist-workspace": true
   },
   "clock": {
-    "format": "{:%H:%M}",
+    "format": "{:%H:%M  %a %m-%d}",
     "format-alt": "{:%Y-%m-%d %H:%M:%S}",
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "interval": 1,
@@ -104,7 +104,7 @@
     "tooltip-format": "{timeTo}\n{capacity}% - {power}W",
     "interval": 30
   },
-"tray": {
+  "tray": {
     "icon-size": 16,
     "spacing": 8,
     "show-passive-items": true
