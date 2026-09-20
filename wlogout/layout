@@ -1,0 +1,38 @@
+[
+  {
+    "label": "lock",
+    "action": "pidof hyprlock || hyprlock",
+    "text": "Lock",
+    "keybind": "l"
+  },
+  {
+    "label": "exit",
+    "action": "hyprctl dispatch hl.dsp.exit()",
+    "text": "Exit",
+    "keybind": "e"
+  },
+  {
+    "label": "logout",
+    "action": "loginctl terminate-user $USER",
+    "text": "Logout",
+    "keybind": "o"
+  },
+  {
+    "label": "reboot",
+    "action": "systemctl reboot",
+    "text": "Reboot",
+    "keybind": "r"
+  },
+  {
+    "label": "shutdown",
+    "action": "systemctl poweroff",
+    "text": "Shutdown",
+    "keybind": "s"
+  },
+  {
+    "label": "hibernate",
+    "action": "systemctl hibernate",
+    "text": "Hibernate",
+    "keybind": "h"
+  }
+]
