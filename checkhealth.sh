@@ -208,11 +208,11 @@ get_install_hint() {
 
 # ────────────────── dependency definitions ──────────────────
 
-REQUIRED_BINS=(hyprctl waybar wezterm wofi grim slurp wl-copy wlogout wpctl hyprpaper hypridle)
+REQUIRED_BINS=(hyprctl waybar wezterm wofi grim slurp wl-copy wlogout wpctl hyprpaper hypridle fcitx5)
 # D-Bus services that may live outside PATH (/usr/lib, /usr/libexec). "notif"
 # is special: it accepts mako OR dunst (any one notification daemon).
 REQUIRED_EXT_BINS=(xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent notif)
-RECOMMENDED_BINS=(nm-applet hyprlock brightnessctl pavucontrol nm-connection-editor hyprpicker hyprsunset)
+RECOMMENDED_BINS=(nm-applet hyprlock brightnessctl pavucontrol nm-connection-editor hyprpicker hyprsunset hyprland-dialog)
 
 # Human-readable name for a dependency binary.
 dep_name() {
@@ -227,6 +227,7 @@ dep_name() {
 	wpctl) echo "wireplumber (wpctl)" ;;
 	hyprpaper) echo "hyprpaper (wallpaper)" ;;
 	hypridle) echo "hypridle (idle management)" ;;
+	fcitx5) echo "fcitx5 (input method framework)" ;;
 	xdg-desktop-portal-hyprland) echo "xdg-desktop-portal-hyprland (capture/sharing portal)" ;;
 	xdg-desktop-portal-gtk) echo "xdg-desktop-portal-gtk (file-chooser portal)" ;;
 	hyprpolkitagent) echo "hyprpolkitagent (polkit auth agent)" ;;
@@ -236,6 +237,7 @@ dep_name() {
 	hyprpicker) echo "hyprpicker (color picker)" ;;
 	hyprsunset) echo "hyprsunset (color temperature)" ;;
 	nm-connection-editor) echo "nm-connection-editor" ;;
+	hyprland-dialog) echo "hyprland-guiutils (GUI helper dialogs/run/welcome)" ;;
 	*) echo "$1" ;;
 	esac
 }
@@ -261,11 +263,12 @@ pkg_name() {
 	opensuse:wl-copy) echo "wl-clipboard" ;;
 	opensuse:wpctl) echo "wireplumber" ;;
 	opensuse:nm-applet) echo "NetworkManager-applet" ;;
-	opensuse:nm-connection-editor) echo "nm-connection-editor" ;;
+	opensuse:nm-connection-editor) echo "NetworkManager-connection-editor" ;;
 	# CentOS-family / dnf
 	centos:wl-copy) echo "wl-clipboard" ;;
 	centos:wpctl) echo "wireplumber" ;;
 	centos:nm-applet) echo "NetworkManager-applet" ;;
+	*:hyprland-dialog) echo "hyprland-guiutils" ;;
 	*)
 		echo "$bin"
 		;;
@@ -324,7 +327,7 @@ print_platform() {
 # Sets MISSING_REQUIRED.
 check_required_tools() {
 	echo -e "${BOLD}Required tools${NC}"
-	echo "  (compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle)"
+	echo "  (compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle/input method)"
 	MISSING_REQUIRED=()
 	local bin candidates
 	for bin in "${REQUIRED_BINS[@]}"; do
@@ -380,7 +383,7 @@ install_missing_required() {
 # Sets MISSING_RECOMMENDED.
 check_recommended_tools() {
 	echo -e "${BOLD}Recommended tools${NC}"
-	echo "  (Missing won't block monkey-hyprland, but will degrade tray / lock / brightness experience)"
+	echo "  (Missing won't block monkey-hyprland, but will degrade tray / lock / brightness / gui-dialog experience)"
 	MISSING_RECOMMENDED=()
 	local bin
 	for bin in "${RECOMMENDED_BINS[@]}"; do
@@ -442,6 +445,30 @@ check_config_files() {
 		echo -e "  ${WARN} hyprland.lua exists but is not a symlink"
 	else
 		echo -e "  ${FAIL} hyprland.lua not found (run: ln -sf ${script_dir}/hyprland.lua ~/.config/hypr/hyprland.lua)"
+		ALL_PASSED=false
+	fi
+
+	local hypr_lock="${HOME}/.config/hypr/hyprlock.conf"
+	if [[ -L "$hypr_lock" ]]; then
+		local lock_target
+		lock_target=$(readlink -f "$hypr_lock" 2>/dev/null || readlink "$hypr_lock")
+		echo -e "  ${PASS} hyprlock.conf → ${lock_target}"
+	elif [[ -f "$hypr_lock" ]]; then
+		echo -e "  ${WARN} hyprlock.conf exists but is not a symlink"
+	else
+		echo -e "  ${FAIL} hyprlock.conf not found (run: ln -sf ${script_dir}/hyprlock.conf ~/.config/hypr/hyprlock.conf)"
+		ALL_PASSED=false
+	fi
+
+	local hypr_idle="${HOME}/.config/hypr/hypridle.conf"
+	if [[ -L "$hypr_idle" ]]; then
+		local idle_target
+		idle_target=$(readlink -f "$hypr_idle" 2>/dev/null || readlink "$hypr_idle")
+		echo -e "  ${PASS} hypridle.conf → ${idle_target}"
+	elif [[ -f "$hypr_idle" ]]; then
+		echo -e "  ${WARN} hypridle.conf exists but is not a symlink"
+	else
+		echo -e "  ${FAIL} hypridle.conf not found (run: ln -sf ${script_dir}/hypridle.conf ~/.config/hypr/hypridle.conf)"
 		ALL_PASSED=false
 	fi
 
