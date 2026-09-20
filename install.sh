@@ -318,7 +318,9 @@ desktop_process_running() {
 
 write_tty_autostart() {
 	local exec_cmd="$1"
-	local marker="# monkey-${exec_cmd,,} autostart"
+	# Marker is fixed regardless of the launcher (start-hyprland vs Hyprland)
+	# so re-runs stay idempotent with blocks written by older installers.
+	local marker="# monkey-hyprland autostart"
 	target_shell_rc
 	# A graphical session is in progress — nothing to do.
 	if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; then
@@ -346,7 +348,8 @@ write_tty_autostart() {
 	fi
 	# Double guard: tty1 login only, and never from an existing session.
 	# exec replaces the shell, so logging out of the compositor returns to
-	# the login prompt; a crashing compositor falls back the same way.
+	# the login prompt. start-hyprland additionally acts as a watchdog and
+	# restarts Hyprland after an unclean exit instead of dropping to the TTY.
 	cat >>"$SHELL_RC" <<EOF
 
 $marker (remove these lines to disable)
@@ -418,7 +421,12 @@ main() {
 	run_checkhealth
 	echo ""
 
-	write_tty_autostart "Hyprland"
+	# The watchdog launcher ships with recent Hyprland builds; fall back to
+	# the plain binary on older ones.
+	local launcher=Hyprland
+	command -v start-hyprland >/dev/null 2>&1 && launcher=start-hyprland
+
+	write_tty_autostart "$launcher"
 	echo ""
 
 	setup_symlinks
@@ -429,9 +437,9 @@ main() {
 	echo -e "${GREEN}${BOLD}monkey-hyprland installation complete!${NC}"
 	echo ""
 	echo -e "  Config: ${CYAN}$INSTALL_DIR${NC} → ${CYAN}~/.config/hypr + ~/.config/waybar${NC}"
-	echo -e "  Start Hyprland from a TTY (never under sudo/root): ${CYAN}Hyprland${NC}"
+	echo -e "  Start Hyprland from a TTY (never under sudo/root): ${CYAN}start-hyprland${NC} (or ${CYAN}Hyprland${NC} on older builds)"
 	if [ "$AUTOSTART_WRITTEN" -eq 1 ]; then
-		echo -e "  Autostart: tty1 login will ${CYAN}exec Hyprland${NC} (block in ${CYAN}$SHELL_RC${NC})"
+		echo -e "  Autostart: tty1 login will ${CYAN}exec $launcher${NC} (block in ${CYAN}$SHELL_RC${NC})"
 	fi
 	echo -e "  Update: ${CYAN}cd $INSTALL_DIR && git pull && hyprctl reload${NC}"
 	echo ""
