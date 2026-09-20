@@ -6,15 +6,15 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 
 **Features:**
 
-| Feature             | Description                                                                         |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| Lua config          | Written in pure Lua against Hyprland's native `hl` API — no hyprlang fragments      |
-| Sonokai theme       | Colors matched to the sonokai dark scheme                                           |
-| Vim-style bindings  | Focus / move / resize windows with `Super + Ctrl/Shift + h/j/k/l`                   |
-| Auto monitor detect | Monitors are auto-detected with `highrr` mode and auto scale/position               |
-| Laptop aware        | Touchpad gestures and brightness keys are enabled automatically on battery machines |
-| Minimal animations  | Animations disabled for performance; subtle blur and shadows kept                   |
-| waybar status bar   | Paired waybar config (workspaces, clock, tray, network, audio, battery, power menu) |
+| Feature             | Description                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lua config          | Written in pure Lua against Hyprland's native `hl` API — no hyprlang fragments                                                                                       |
+| Sonokai theme       | Colors matched to the sonokai dark scheme                                                                                                                            |
+| Vim-style bindings  | Focus / move / resize windows with `Super + Ctrl/Shift + h/j/k/l`                                                                                                    |
+| Auto monitor detect | Monitors are auto-detected on their EDID `preferred` (native) mode with auto position; scale defaults to `1.0` (set `scale` in `hyprland.lua`, e.g. `2.0` for HiDPI) |
+| Laptop aware        | Touchpad gestures and brightness keys are enabled automatically on battery machines                                                                                  |
+| Minimal animations  | Animations disabled for performance; subtle blur and shadows kept                                                                                                    |
+| waybar status bar   | Paired waybar config (workspaces, clock, tray, network, audio, battery, power menu)                                                                                  |
 
 ## Requirements
 
@@ -34,55 +34,65 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 
 #### Common tools
 
-| Tool                                        | Purpose                                                                   | Required |
-| ------------------------------------------- | ------------------------------------------------------------------------- | -------- |
-| Hyprland                                    | The compositor (must support the Lua `hl` config API)                     | Yes      |
-| [waybar](https://github.com/Alexays/Waybar) | Status bar (workspaces, tray, network, audio, battery)                    | Yes      |
-| wezterm                                     | Default terminal emulator (`Super + Enter`)                               | Yes      |
-| wofi                                        | Application launcher (`Super + d`)                                        | Yes      |
-| grim + slurp                                | Screenshot region selection (`Super+,`) and full screen (`Super+Shift+,`) | Yes      |
-| wl-clipboard (`wl-copy`)                    | Screenshots are piped to the clipboard                                    | Yes      |
-| wlogout                                     | Power menu (waybar power button)                                          | Yes      |
-| wireplumber (`wpctl`)                       | Volume / mute keys and the waybar audio module                            | Yes      |
-| xdg-desktop-portal-hyprland                 | Screen capture / screen sharing portal backend                            | Yes      |
-| xdg-desktop-portal-gtk                      | File chooser portal for GTK/Flatpak apps (coexists with the hyprland one) | Yes      |
-| hyprpolkitagent                             | Polkit authentication agent for GUI privilege prompts                     | Yes      |
-| mako (or dunst)                             | Notification daemon (backend for waybar notification modules)             | Yes      |
+| Tool                                        | Purpose                                                                    | Required |
+| ------------------------------------------- | -------------------------------------------------------------------------- | -------- |
+| Hyprland                                    | The compositor (must support the Lua `hl` config API)                      | Yes      |
+| [waybar](https://github.com/Alexays/Waybar) | Status bar (workspaces, tray, network, audio, battery)                     | Yes      |
+| wezterm                                     | Default terminal emulator (`Super + Enter`)                                | Yes      |
+| wofi                                        | Application launcher (`Super + d`)                                         | Yes      |
+| grim + slurp                                | Screenshot region selection (`Super+,`) and full screen (`Super+Shift+,`)  | Yes      |
+| wl-clipboard (`wl-copy`)                    | Screenshots are piped to the clipboard                                     | Yes      |
+| wlogout                                     | Power menu (waybar power button)                                           | Yes      |
+| wireplumber (`wpctl`)                       | Volume / mute keys and the waybar audio module                             | Yes      |
+| xdg-desktop-portal-hyprland                 | Screen capture / screen sharing portal backend                             | Yes      |
+| xdg-desktop-portal-gtk                      | File chooser portal for GTK/Flatpak apps (coexists with the hyprland one)  | Yes      |
+| hyprpolkitagent                             | Polkit authentication agent for GUI privilege prompts                      | Yes      |
+| mako (or dunst)                             | Notification daemon (backend for waybar notification modules)              | Yes      |
+| fcitx5                                      | Input method framework (auto-started; GTK/Qt/X11 apps use it via env vars) | Yes      |
 
 #### Recommended tools
 
-| Tool                 | Purpose                                                 | Required    |
-| -------------------- | ------------------------------------------------------- | ----------- |
-| nm-applet            | Tray network manager applet (auto-started when present) | Recommended |
-| hyprlock             | Screen locker (`Super + Escape`)                        | Recommended |
-| brightnessctl        | Brightness keys (laptops only, auto-detected)           | Recommended |
-| pavucontrol          | Audio mixer (waybar pulseaudio click)                   | Recommended |
-| nm-connection-editor | Network settings (waybar network click)                 | Recommended |
-| gnome-calendar       | Calendar (waybar clock right-click)                     | Optional    |
+| Tool                 | Purpose                                                                                 | Required    |
+| -------------------- | --------------------------------------------------------------------------------------- | ----------- |
+| nm-applet            | Tray network manager applet (auto-started when present)                                 | Recommended |
+| hyprlock             | Screen locker (`Super + Escape`)                                                        | Recommended |
+| brightnessctl        | Brightness keys (laptops only, auto-detected)                                           | Recommended |
+| pavucontrol          | Audio mixer (waybar pulseaudio click)                                                   | Recommended |
+| nm-connection-editor | Network settings (waybar network click)                                                 | Recommended |
+| hyprland-guiutils    | Native GUI dialogs (hyprland-dialog/run/welcome; silences the Hyprland startup warning) | Recommended |
+| gnome-calendar       | Calendar (waybar clock right-click)                                                     | Optional    |
 
 ```bash
 # Debian
 sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wireplumber \
     network-manager-gnome brightnessctl pavucontrol nm-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako fcitx5 fcitx5-chinese-addons
 # wezterm: https://wezterm.org/installation
 # hyprlock: https://github.com/hyprwm/hyprlock (not in older apt repos)
 # hyprpolkitagent: not in all apt repos — build from source if absent (see Requirements)
 
 # OpenSUSE
-sudo zypper install hyprland waybar wofi grim slurp wl-clipboard wlogout wireplumber \
-    NetworkManager-applet brightnessctl pavucontrol nm-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent
+sudo zypper install hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
+    NetworkManager-applet brightnessctl pavucontrol NetworkManager-connection-editor gnome-calendar \
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent \
+    NetworkManager-connection-editor fcitx5 fcitx5-chinese-addons fcitx5-configtool
+# hyprlock / hyprpicker / hyprsunset are NOT in the base openSUSE repos — enable
+# the community Wayland repo first so `checkhealth --install` can resolve them:
+#   sudo zypper addrepo -cfp 90 https://download.opensuse.org/repositories/X11:/Wayland/Tumbleweed/ X11:Wayland
+#   sudo zypper --gpg-auto-import-keys refresh
+sudo zypper install hyprlock hyprpicker hyprsunset 2>/dev/null || echo "still not present — add X11:Wayland repo (path above) or build from source (https://github.com/hyprwm/hyprlock)"
 
 # Arch Linux
 sudo pacman -S hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
     network-manager-applet hyprlock brightnessctl pavucontrol nm-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent mako hyprpaper hypridle
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent mako hyprpaper hypridle \
+    fcitx5 fcitx5-chinese-addons fcitx5-configtool
+# also install fcitx5-qt fcitx5-gtk to make Qt/GTK apps use the input method
 
 # CentOS/RHEL — hyprland is not packaged in any repo; build it from source
 # (see Requirements). The remaining tools:
 sudo dnf install waybar grim slurp wl-clipboard wireplumber brightnessctl pavucontrol \
-    xdg-desktop-portal-gtk mako hyprpolkitagent
+    xdg-desktop-portal-gtk mako hyprpolkitagent fcitx5 fcitx5-chinese-addons
 # wezterm: https://wezterm.org/installation
 # wofi, wlogout, hyprlock, xdg-desktop-portal-hyprland: build from source or via COPR
 ```
@@ -130,10 +140,13 @@ Prefer manual setup? Clone and link:
 git clone https://github.com/QMonkey/monkey-hyprland.git
 cd monkey-hyprland
 ln -sfn $(pwd)/hyprland.lua ~/.config/hypr/hyprland.lua
+ln -sfn $(pwd)/hyprlock.conf ~/.config/hypr/hyprlock.conf
+ln -sfn $(pwd)/hypridle.conf ~/.config/hypr/hypridle.conf
 ln -sfn $(pwd)/waybar ~/.config/waybar
+ln -sfn $(pwd)/wlogout ~/.config/wlogout
 ```
 
-Then start (or restart) Hyprland. waybar and nm-applet are launched automatically on startup.
+Then start (or restart) Hyprland. waybar, nm-applet and fcitx5 are launched automatically on startup.
 
 ### 4. Start Hyprland
 
@@ -232,7 +245,7 @@ Super+Shift+]         Move window to next monitor
 Super+Return          Terminal (wezterm)
 Super+d               Application launcher (wofi drun)
 Super+Escape          Lock screen (hyprlock, if installed)
-Super+Shift+e         Exit Hyprland
+Super+Shift+e         Power menu (wlogout: lock/exit/logout/reboot/shutdown/hibernate — keys l/e/o/r/s/h, shown on the buttons, Esc cancels)
 ```
 
 ### 4. Media & brightness keys
@@ -281,7 +294,7 @@ modules-center:  clock                (click for full date, right-click gnome-ca
 modules-right:   tray, network, pulseaudio, battery, custom/power
 ```
 
-- Logout/minimalism: there is no `custom/power` module in the bundled config — exit with `Super+Shift+e` instead ([wlogout](https://github.com/ArtsyMacaw/wlogout) is only needed if you re-add the module)
+- There is no `custom/power` module in the bundled config — the power menu is `wlogout` on `Super+Shift+e` (bundled `wlogout/` layout + style; buttons bound to l/e/r/s, Esc cancels)
 - Battery has warning (30%) / critical (15%) states; hidden on desktops without a battery
 - The style uses the same sonokai palette as `hyprland.lua`
 
@@ -289,7 +302,8 @@ modules-right:   tray, network, pulseaudio, battery, custom/power
 
 - **Lua config requires Hyprland 0.55.0+** — this config uses the native `hl` Lua API, introduced in 0.55.0. On older builds the Lua file will not load; build from source (see the note in Requirements).
 - **Terminal is wezterm** — change the `terminal` variable at the top of `hyprland.lua` to switch (any of `Alacritty|kitty|wezterm|foot|ghostty` also picks up the opacity window rule).
+- **Scale is fixed at `1.0` by default** — `scale = "auto"` can over-amplify on displays that report a wrong/small physical size (VM, VNC/RDP, headless). Tune the `scale` variable at the top of `hyprland.lua` and reload (`hyprctl reload`).
 - **Animations are disabled** by design for performance; enable them in the `animations` section if you prefer.
 - **Lid switch may not fire under Lua** — `switch:on:Lid Switch` has a known regression in Lua configs (hyprwm/Hyprland#14858). If you rely on lid-close locking, prefer a udev rule running `loginctl lock-session` on `LID_STATE=closed` over the bind.
 - **No `hl.config({ autogenerated = true })`** — this config is hand-written and omits the shipped-example flag, so no persistent yellow warning bar appears.
-- **Environment is pre-set for Wayland** — `hyprland.lua` exports `XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `XDG_SESSION_DESKTOP`, `QT_QPA_PLATFORM=wayland;xcb`, `QT_WAYLAND_DISABLE_WINDOWDECORATION` and an Electron ozone hint, keeping Qt/GTK/Electron apps off blurry XWayland and portals behaving correctly.
+- **Environment is pre-set for Wayland** — `hyprland.lua` exports `XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `XDG_SESSION_DESKTOP`, `QT_QPA_PLATFORM=wayland;xcb`, `QT_WAYLAND_DISABLE_WINDOWDECORATION` and an Electron ozone hint, keeping Qt/GTK/Electron apps off blurry XWayland and portals behaving correctly. Input method env vars `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, `XMODIFIERS=@im=fcitx` are exported too, so GTK/Qt/X11 apps route typing through fcitx5.
