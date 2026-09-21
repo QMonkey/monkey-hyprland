@@ -15,6 +15,7 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | Laptop aware        | Touchpad gestures and brightness keys are enabled automatically on battery machines                                                                                  |
 | Minimal animations  | Animations disabled for performance; subtle blur and shadows kept                                                                                                    |
 | waybar status bar   | Paired waybar config (workspaces, clock, tray, network, audio, battery, power menu)                                                                                  |
+| Wallpaper           | hyprpaper applies the bundled aurora image (`pictures/`) on every monitor via `hyprpaper.conf`                                                                       |
 
 ## Requirements
 
@@ -49,6 +50,8 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | hyprpolkitagent                             | Polkit authentication agent for GUI privilege prompts                      | Yes      |
 | mako (or dunst)                             | Notification daemon (backend for waybar notification modules)              | Yes      |
 | fcitx5                                      | Input method framework (auto-started; GTK/Qt/X11 apps use it via env vars) | Yes      |
+| hyprpaper                                   | Wallpaper daemon (auto-started; reads the bundled `hyprpaper.conf`)        | Yes      |
+| hypridle                                    | Idle daemon (auto lock/suspend via the bundled `hypridle.conf`)            | Yes      |
 
 #### Recommended tools
 
@@ -66,7 +69,8 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 # Debian
 sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wireplumber \
     network-manager-gnome brightnessctl pavucontrol nm-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako fcitx5 fcitx5-chinese-addons
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako fcitx5 fcitx5-chinese-addons \
+    hyprpaper hypridle
 # wezterm: https://wezterm.org/installation
 # hyprlock: https://github.com/hyprwm/hyprlock (not in older apt repos)
 # hyprpolkitagent: not in all apt repos — build from source if absent (see Requirements)
@@ -74,7 +78,7 @@ sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wirepl
 # OpenSUSE
 sudo zypper install hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
     NetworkManager-applet brightnessctl pavucontrol NetworkManager-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent \
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle \
     NetworkManager-connection-editor fcitx5 fcitx5-chinese-addons fcitx5-configtool
 # hyprlock / hyprpicker / hyprsunset are NOT in the base openSUSE repos — enable
 # the community Wayland repo first so `checkhealth --install` can resolve them:
@@ -92,7 +96,7 @@ sudo pacman -S hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wire
 # CentOS/RHEL — hyprland is not packaged in any repo; build it from source
 # (see Requirements). The remaining tools:
 sudo dnf install waybar grim slurp wl-clipboard wireplumber brightnessctl pavucontrol \
-    xdg-desktop-portal-gtk mako hyprpolkitagent fcitx5 fcitx5-chinese-addons
+    xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle fcitx5 fcitx5-chinese-addons
 # wezterm: https://wezterm.org/installation
 # wofi, wlogout, hyprlock, xdg-desktop-portal-hyprland: build from source or via COPR
 ```
@@ -139,12 +143,13 @@ Prefer manual setup? Clone and link:
 ```bash
 git clone https://github.com/QMonkey/monkey-hyprland.git
 cd monkey-hyprland
-ln -sfn $(pwd)/hyprland.lua ~/.config/hypr/hyprland.lua
-ln -sfn $(pwd)/hyprlock.conf ~/.config/hypr/hyprlock.conf
-ln -sfn $(pwd)/hypridle.conf ~/.config/hypr/hypridle.conf
+mkdir -p ~/.config
+ln -sfn $(pwd) ~/.config/hypr
 ln -sfn $(pwd)/waybar ~/.config/waybar
 ln -sfn $(pwd)/wlogout ~/.config/wlogout
 ```
+
+The whole repo is linked as `~/.config/hypr` (so every `hypr*.conf`, `hyprland.lua` and `pictures/` is picked up automatically); waybar and wlogout live at their own `~/.config/` locations and are linked separately.
 
 Then start (or restart) Hyprland. waybar, nm-applet and fcitx5 are launched automatically on startup.
 
@@ -247,7 +252,7 @@ cd monkey-hyprland
 git pull
 ```
 
-Reload the config with `hyprctl reload` (or restart Hyprland) and `pkill waybar; waybar &` for waybar changes.
+Reload the config with `hyprctl reload` (or restart Hyprland) and `pkill waybar; waybar &` for waybar changes. `hyprpaper.conf` is read once at startup — restart it with `pkill hyprpaper; hyprpaper &` after wallpaper changes.
 
 ## Keybindings
 
