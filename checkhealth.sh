@@ -136,7 +136,11 @@ os_detect() {
 			# shellcheck disable=SC1091
 			. /etc/os-release
 			case "$ID" in
-			ubuntu | debian | linuxmint | pop | elementary | zorin) echo "debian" ;;
+			# Ubuntu and its derivatives get their own class: the Hyprland
+			# package names differ from Debian's (e.g. hyprland-qtutils vs
+			# hyprland-guiutils, mako-notifier) and coverage differs per release.
+			ubuntu | linuxmint | pop | elementary | zorin) echo "ubuntu" ;;
+			debian) echo "debian" ;;
 			arch | manjaro | endeavouros) echo "arch" ;;
 			opensuse | opensuse-leap | opensuse-tumbleweed | opensuse-microos | suse | sles) echo "opensuse" ;;
 			centos | rhel | fedora | rocky | almalinux | ol) echo "centos" ;;
@@ -163,7 +167,7 @@ refresh_pkg() {
 	local attempt
 	for attempt in 1 2; do
 		case "$OS" in
-		debian) sudo_cmd apt-get update ;;
+		debian | ubuntu) sudo_cmd apt-get update ;;
 		arch) sudo_cmd pacman -Sy ;;
 		opensuse) sudo_cmd zypper --non-interactive refresh ;;
 		centos) sudo_cmd dnf makecache -q ;;
@@ -179,7 +183,7 @@ install_pkg() {
 	refresh_pkg
 	local _rc=0
 	case "$OS" in
-	debian) sudo_cmd apt-get install -y "$@" || _rc=1 ;;
+	debian | ubuntu) sudo_cmd apt-get install -y "$@" || _rc=1 ;;
 	arch) sudo_cmd pacman -S --noconfirm "$@" || _rc=1 ;;
 	opensuse) sudo_cmd zypper --non-interactive install -y "$@" || _rc=1 ;;
 	centos)
@@ -198,7 +202,7 @@ install_pkg() {
 
 get_install_hint() {
 	case "$OS" in
-	debian) echo "sudo apt-get install ${*}" ;;
+	debian | ubuntu) echo "sudo apt-get install ${*}" ;;
 	opensuse) echo "sudo zypper install ${*}" ;;
 	centos) echo "sudo dnf install ${*}" ;;
 	arch) echo "sudo pacman -S ${*}" ;;
@@ -247,13 +251,32 @@ dep_name() {
 pkg_name() {
 	local bin="$1"
 	case "$OS:$bin" in
+	# The GUI dialog helpers (upstream hyprland-qtutils): Debian and Arch
+	# name the binary package hyprland-guiutils, Ubuntu hyprland-qtutils.
+	# Coverage varies per release (Ubuntu < 26.04, Debian trixie: absent)
+	# — the availability probe degrades gracefully when missing.
+	ubuntu:hyprland-dialog) echo "hyprland-qtutils" ;;
+	debian:hyprland-dialog) echo "hyprland-guiutils" ;;
+	arch:hyprland-dialog) echo "hyprland-guiutils" ;;
 	# Sentinel: notification daemon — install mako by default
+	# apt-family: the package is named mako-notifier and dunst is present
+	# everywhere — dunst is the safe default. EPEL: dunst only.
+	debian:notif | ubuntu:notif | centos:notif) echo "dunst" ;;
 	*:notif) echo "mako" ;;
+	# hyprctl ships inside the compositor package on every distro
+	*:hyprctl) echo "hyprland" ;;
 	# Debian / apt
 	debian:wl-copy) echo "wl-clipboard" ;;
 	debian:wpctl) echo "wireplumber" ;;
 	debian:nm-applet) echo "network-manager-gnome" ;;
-	debian:nm-connection-editor) echo "nm-connection-editor" ;;
+	# nm-connection-editor is a binary of network-manager-gnome on
+	# Debian/Ubuntu — there is no separate package
+	debian:nm-connection-editor) echo "network-manager-gnome" ;;
+	# Ubuntu / apt: same package names as Debian
+	ubuntu:wl-copy) echo "wl-clipboard" ;;
+	ubuntu:wpctl) echo "wireplumber" ;;
+	ubuntu:nm-applet) echo "network-manager-gnome" ;;
+	ubuntu:nm-connection-editor) echo "network-manager-gnome" ;;
 	# Arch / pacman
 	arch:wl-copy) echo "wl-clipboard" ;;
 	arch:wpctl) echo "wireplumber" ;;
@@ -264,11 +287,11 @@ pkg_name() {
 	opensuse:wpctl) echo "wireplumber" ;;
 	opensuse:nm-applet) echo "NetworkManager-applet" ;;
 	opensuse:nm-connection-editor) echo "NetworkManager-connection-editor" ;;
-	# CentOS-family / dnf
+	# CentOS-family / dnf: nm-applet ships in the nm-connection-editor
+	# package on Fedora; "NetworkManager-applet" is not a real binary name
 	centos:wl-copy) echo "wl-clipboard" ;;
 	centos:wpctl) echo "wireplumber" ;;
-	centos:nm-applet) echo "NetworkManager-applet" ;;
-	*:hyprland-dialog) echo "hyprland-guiutils" ;;
+	centos:nm-applet) echo "nm-connection-editor" ;;
 	*)
 		echo "$bin"
 		;;
@@ -315,7 +338,7 @@ print_platform() {
 	echo -e "${BOLD}Platform${NC}"
 	echo -e "  OS: ${CYAN}$(uname -s)${NC}"
 	case "$OS" in
-	debian) echo -e "  Package manager: ${CYAN}apt${NC}" ;;
+	debian | ubuntu) echo -e "  Package manager: ${CYAN}apt${NC}" ;;
 	opensuse) echo -e "  Package manager: ${CYAN}zypper${NC}" ;;
 	centos) echo -e "  Package manager: ${CYAN}dnf${NC}" ;;
 	arch) echo -e "  Package manager: ${CYAN}pacman${NC}" ;;
