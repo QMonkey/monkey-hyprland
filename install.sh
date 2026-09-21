@@ -8,7 +8,9 @@ set -euo pipefail
 # Installs Hyprland from the distro repo when its version supports the Lua
 # config API (>= 0.55), installs the remaining dependencies via
 # checkhealth.sh --install, clones this repo and links the configs, and
-# (on a bare-TTY machine) writes a guarded tty1 autostart block.
+# writes a guarded VT autostart block into the shell profile files
+# (the meta-installer's dependency order puts the compositor before tmux,
+# so the block lands above any tmux auto-start block).
 # ──────────────────────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -24,8 +26,7 @@ SUDO_NOPASSWD=0
 NOPASSWD_DROPIN="$SUDOERS_D_DIR/zz-monkey-hyprland-nopasswd"
 SUDO_BIN=""
 SUDO_KEEPALIVE_PID=""
-SHELL_RC=""
-AUTOSTART_WRITTEN=0
+AUTOSTART_FILES=""
 
 # Never let a missing HOME fail later under `set -u`.
 [ -n "${HOME:-}" ] || {
@@ -289,76 +290,91 @@ run_checkhealth() {
 	fi
 }
 
-# ────────────────── Step 4: tty1 autostart (bare-TTY machines only) ──────────────────
+# ────────────────── Step 4: compositor autostart (guarded VT login) ──────────────────
 
-target_shell_rc() {
-	# The login shell decides the rc file: zsh → ~/.zshrc, anything else →
-	# ~/.bashrc. getent is absent on macOS but this installer is Linux-only.
+# Print the shell startup files for the login shell:
+#   - zsh: profile ONLY (~/.zprofile). .zshrc is repo-managed and sources
+#     the profile for non-login shells.
+#   - bash: profile AND rc (~/.bash_profile or ~/.profile + ~/.bashrc).
+#     Non-login interactive bash (desktop terminal emulators, VS Code
+#     terminal) only reads ~/.bashrc.
+shell_env_files() {
 	local shell_bin=""
 	if have_native_cmd getent; then
 		shell_bin=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
 	fi
-	shell_bin="${shell_bin:-${SHELL:-}}"
+	shell_bin="${shell_bin:-${SHELL:-bash}}"
 	case "${shell_bin##*/}" in
-	zsh) SHELL_RC="$HOME/.zshrc" ;;
-	*) SHELL_RC="$HOME/.bashrc" ;;
+	zsh)
+		printf '%s\n' "$HOME/.zprofile"
+		;;
+	bash)
+		if [ -f "$HOME/.bash_profile" ]; then
+			printf '%s\n' "$HOME/.bash_profile"
+		else
+			printf '%s\n' "$HOME/.profile"
+		fi
+		printf '%s\n' "$HOME/.bashrc"
+		;;
+	*)
+		printf '%s\n' "$HOME/.profile"
+		;;
 	esac
 }
 
-# True when a display manager or desktop session process is running.
-# Stem-based ERE over full `ps` args — never hardcode versioned names
-# (gdm/gdm2/gdm3/future gdmN and *-greeter variants all match). Anchors
-# (^|/) keep the pattern from matching this grep's own args. `ps` (procps)
-# is universal — no systemctl/loginctl dependency, portable to non-systemd
-# distros.
-desktop_process_running() {
-	local pattern='(^|/)(gdm|sddm|lightdm|lxdm|slim|ly|greetd|xdm|wdm|nodm)([0-9]+)?([-_:. ]|$)|(^|/)(gnome-(shell|session|session-binary)|startplasma(-wayland|-x11)?|plasmashell|xfce4-session|mate-session|cinnamon(-session|-launcher)?|lxsession|lxqt-session|budgie-panel|deepin-session)'
-	ps -eo args= 2>/dev/null | grep -Eq "$pattern"
+# The guarded autostart block. POSIX sh: it lands in ~/.profile too, which
+# display managers may source with a minimal shell. Guards, cheapest first,
+# so shells inside a desktop terminal or tmux pane short-circuit with zero
+# forks:
+#   1. $WAYLAND_DISPLAY / $DISPLAY both unset — one of them is set in any
+#      desktop session (Wayland or X11).
+#   2. stdin is a real VT (/dev/ttyN) — excludes ssh (/dev/pts/N), tmux
+#      panes and desktop terminals in one check. Immune to inherited env:
+#      a TTY-started tmux server passes XDG_VTNR down to its panes, but
+#      their stdin stays a pty.
+#   3. no Hyprland running — single-instance policy: once Hyprland owns a
+#      session, VT logins on other consoles fall through to a plain shell
+#      (the escape hatch instead of a second compositor).
+# Other desktops (X11 or Wayland) are deliberately NOT checked: logind
+# arbitrates the seat per session, so Hyprland coexists with them.
+autostart_block() {
+	local exec_cmd="$1" pgrep_name="$2"
+	cat <<EOF
+# monkey-hyprland autostart (remove these lines to disable)
+# Keep this block ABOVE any "exec tmux" auto-start block: on a bare TTY
+# exec replaces the login shell with the compositor, so the tmux
+# auto-start line is never reached and the desktop never runs inside a
+# tmux pane. Inside a desktop terminal the env guards short-circuit and
+# the tmux auto-start runs normally.
+if [ -z "\${WAYLAND_DISPLAY:-}" ] && [ -z "\${DISPLAY:-}" ]; then
+    case "\$(tty 2>/dev/null)" in
+    /dev/tty[0-9]*) pgrep -x $pgrep_name >/dev/null 2>&1 || exec $exec_cmd ;;
+    esac
+fi
+EOF
 }
 
 write_tty_autostart() {
-	local exec_cmd="$1"
-	# Marker is fixed regardless of the launcher (start-hyprland vs Hyprland)
-	# so re-runs stay idempotent with blocks written by older installers.
-	local marker="# monkey-hyprland autostart"
-	target_shell_rc
-	# A graphical session is in progress — nothing to do.
-	if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; then
-		return 0
-	fi
-	# WSL has no VT login — XDG_VTNR is never set, so the guarded block
-	# would be dead code. WSLg renders single GUI apps without a compositor.
+	local exec_cmd="$1" pgrep_name="$2"
+	local marker="# monkey-hyprland autostart" f
+	# WSL has no VT login — stdin never resolves to /dev/ttyN, so the
+	# guarded block would be dead code. WSLg renders single GUI apps
+	# without a compositor.
 	if is_wsl; then
 		info "WSL detected — skipping autostart setup (no VT login; WSLg covers GUI apps)."
 		return 0
 	fi
-	if ! have_native_cmd ps; then
-		warn "ps not found — cannot detect a running desktop, skipping autostart setup."
-		echo -e "    Add the tty1 autostart block to ${CYAN}${SHELL_RC}${NC} manually (see README)."
-		return 0
-	fi
-	if desktop_process_running; then
-		info "A display manager or desktop session is running — skipping autostart setup."
-		return 0
-	fi
-	[ -f "$SHELL_RC" ] || touch "$SHELL_RC"
-	if grep -qF -- "$marker" "$SHELL_RC"; then
-		ok "autostart block already present in $SHELL_RC."
-		return 0
-	fi
-	# Double guard: tty1 login only, and never from an existing session.
-	# exec replaces the shell, so logging out of the compositor returns to
-	# the login prompt. start-hyprland additionally acts as a watchdog and
-	# restarts Hyprland after an unclean exit instead of dropping to the TTY.
-	cat >>"$SHELL_RC" <<EOF
-
-$marker (remove these lines to disable)
-if [ -z "\$WAYLAND_DISPLAY" ] && [ "\$XDG_VTNR" = 1 ]; then
-    exec $exec_cmd
-fi
-EOF
-	AUTOSTART_WRITTEN=1
-	ok "Added tty1 autostart block to $SHELL_RC (remove the '$marker' lines to disable)."
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		[ -f "$f" ] || touch "$f"
+		if grep -qF -- "$marker" "$f"; then
+			ok "autostart block already present in $f."
+		else
+			printf '\n%s\n' "$(autostart_block "$exec_cmd" "$pgrep_name")" >>"$f"
+			ok "Added autostart block to $f."
+		fi
+		AUTOSTART_FILES="$AUTOSTART_FILES $f"
+	done < <(shell_env_files)
 }
 
 # ────────────────── Step 5: symlinks ──────────────────
@@ -424,7 +440,9 @@ main() {
 	local launcher=Hyprland
 	command -v start-hyprland >/dev/null 2>&1 && launcher=start-hyprland
 
-	write_tty_autostart "$launcher"
+	# pgrep matches the compositor process name, not the launcher: the
+	# start-hyprland watchdog execs into Hyprland either way.
+	write_tty_autostart "$launcher" Hyprland
 	echo ""
 
 	setup_symlinks
@@ -436,8 +454,8 @@ main() {
 	echo ""
 	echo -e "  Config: ${CYAN}$INSTALL_DIR${NC} → ${CYAN}~/.config/hypr + ~/.config/waybar${NC}"
 	echo -e "  Start Hyprland from a TTY (never under sudo/root): ${CYAN}start-hyprland${NC} (or ${CYAN}Hyprland${NC} on older builds)"
-	if [ "$AUTOSTART_WRITTEN" -eq 1 ]; then
-		echo -e "  Autostart: tty1 login will ${CYAN}exec $launcher${NC} (block in ${CYAN}$SHELL_RC${NC})"
+	if [ -n "$AUTOSTART_FILES" ]; then
+		echo -e "  Autostart: a VT login execs ${CYAN}$launcher${NC} unless Hyprland is already running (block in:${CYAN}$AUTOSTART_FILES${NC})"
 	fi
 	echo -e "  Update: ${CYAN}cd $INSTALL_DIR && git pull && hyprctl reload${NC}"
 	echo ""
