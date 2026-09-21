@@ -436,39 +436,22 @@ check_config_files() {
 	local script_dir
 	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-	local hypr_config="${HOME}/.config/hypr/hyprland.lua"
-	if [[ -L "$hypr_config" ]]; then
+	# The whole repo is expected to be linked as ~/.config/hypr (single dir
+	# link covers hyprland.lua, hypr*.conf and pictures/). waybar/wlogout
+	# are checked separately below.
+	local hypr_dir="${HOME}/.config/hypr"
+	if [[ -L "$hypr_dir" ]]; then
 		local target
-		target=$(readlink -f "$hypr_config" 2>/dev/null || readlink "$hypr_config")
-		echo -e "  ${PASS} hyprland.lua → ${target}"
-	elif [[ -f "$hypr_config" ]]; then
-		echo -e "  ${WARN} hyprland.lua exists but is not a symlink"
+		target=$(readlink -f "$hypr_dir" 2>/dev/null || readlink "$hypr_dir")
+		if [[ "$target" == "$script_dir" ]]; then
+			echo -e "  ${PASS} ~/.config/hypr → ${target}"
+		else
+			echo -e "  ${WARN} ~/.config/hypr → ${target} (not this repo: ${script_dir})"
+		fi
+	elif [[ -d "$hypr_dir" ]]; then
+		echo -e "  ${WARN} ~/.config/hypr is a plain directory (old per-file links) — re-link: ln -sfn ${script_dir} ${hypr_dir}"
 	else
-		echo -e "  ${FAIL} hyprland.lua not found (run: ln -sf ${script_dir}/hyprland.lua ~/.config/hypr/hyprland.lua)"
-		ALL_PASSED=false
-	fi
-
-	local hypr_lock="${HOME}/.config/hypr/hyprlock.conf"
-	if [[ -L "$hypr_lock" ]]; then
-		local lock_target
-		lock_target=$(readlink -f "$hypr_lock" 2>/dev/null || readlink "$hypr_lock")
-		echo -e "  ${PASS} hyprlock.conf → ${lock_target}"
-	elif [[ -f "$hypr_lock" ]]; then
-		echo -e "  ${WARN} hyprlock.conf exists but is not a symlink"
-	else
-		echo -e "  ${FAIL} hyprlock.conf not found (run: ln -sf ${script_dir}/hyprlock.conf ~/.config/hypr/hyprlock.conf)"
-		ALL_PASSED=false
-	fi
-
-	local hypr_idle="${HOME}/.config/hypr/hypridle.conf"
-	if [[ -L "$hypr_idle" ]]; then
-		local idle_target
-		idle_target=$(readlink -f "$hypr_idle" 2>/dev/null || readlink "$hypr_idle")
-		echo -e "  ${PASS} hypridle.conf → ${idle_target}"
-	elif [[ -f "$hypr_idle" ]]; then
-		echo -e "  ${WARN} hypridle.conf exists but is not a symlink"
-	else
-		echo -e "  ${FAIL} hypridle.conf not found (run: ln -sf ${script_dir}/hypridle.conf ~/.config/hypr/hypridle.conf)"
+		echo -e "  ${FAIL} ~/.config/hypr not found (run: ln -sfn ${script_dir} ~/.config/hypr)"
 		ALL_PASSED=false
 	fi
 
