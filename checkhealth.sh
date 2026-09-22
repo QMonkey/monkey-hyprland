@@ -251,13 +251,15 @@ dep_name() {
 pkg_name() {
 	local bin="$1"
 	case "$OS:$bin" in
-	# The GUI dialog helpers (upstream hyprland-qtutils): Debian and Arch
-	# name the binary package hyprland-guiutils, Ubuntu hyprland-qtutils.
+	# The GUI dialog helpers (upstream hyprland-qtutils): Debian, Arch and
+	# openSUSE name the binary package hyprland-guiutils, Ubuntu
+	# hyprland-qtutils.
 	# Coverage varies per release (Ubuntu < 26.04, Debian trixie: absent)
 	# — the availability probe degrades gracefully when missing.
 	ubuntu:hyprland-dialog) echo "hyprland-qtutils" ;;
 	debian:hyprland-dialog) echo "hyprland-guiutils" ;;
 	arch:hyprland-dialog) echo "hyprland-guiutils" ;;
+	opensuse:hyprland-dialog) echo "hyprland-guiutils" ;;
 	# Sentinel: notification daemon — install mako by default
 	# apt-family: the package is named mako-notifier and dunst is present
 	# everywhere — dunst is the safe default. EPEL: dunst only.
