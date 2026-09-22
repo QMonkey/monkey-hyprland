@@ -15,7 +15,6 @@
   // Right modules
   "modules-right": [
     "tray",
-    "network",
     "pulseaudio",
     "battery"
   ],
@@ -40,14 +39,6 @@
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "interval": 1,
     "on-click-right": "gnome-calendar"
-  },
-  "network": {
-    "format-wifi": " {signalStrength}%",
-    "format-ethernet": " {ifname}",
-    "format-disconnected": " Offline",
-    "tooltip-format": "{ifname}: {ipaddr}/{cidr}",
-    "tooltip-format-wifi": "{ifname}: {ipaddr}/{cidr}\nStrength: {signalStrength}%",
-    "on-click": "nm-connection-editor"
   },
   "pulseaudio": {
     "format": "{icon} {volume}%",
