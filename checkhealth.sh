@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m'
 
-PASS="[${GREEN}✓${NC}]"
-FAIL="[${RED}✗${NC}]"
-WARN="[${YELLOW}!${NC}]"
+# List-item helpers: 2-space indent, brackets outside the color span,
+# OK centered as [ OK ]. fail() does not abort — checkhealth must keep
+# going and summarize (exit status comes from REQUIRED_FAILURES).
+info() { echo -e "  [${CYAN}INFO${NC}] $*"; }
+ok() { echo -e "  [${GREEN} OK ${NC}] $*"; }
+warn() { echo -e "  [${YELLOW}WARN${NC}] $*"; }
+fail() {
+	echo -e "  [${RED}FAIL${NC}] $*"
+}
 
-ALL_PASSED=true
+REQUIRED_FAILURES=0
 INSTALL_MODE=false
 SKIP_CONFIG_CHECKS=false
 
@@ -90,10 +96,10 @@ sudo_cmd() {
 
 check_bin() {
 	if have_native_cmd "$1"; then
-		echo -e "  ${PASS} ${2:-$1}"
+		ok "${2:-$1}"
 		return 0
 	else
-		echo -e "  ${FAIL} ${2:-$1}"
+		fail "${2:-$1}"
 		return 1
 	fi
 }
@@ -106,11 +112,11 @@ check_bin_ext() {
 	shift
 	for b in "$@"; do
 		if have_native_cmd "$b" || [[ -x "/usr/lib/$b" ]] || [[ -x "/usr/libexec/$b" ]]; then
-			echo -e "  ${PASS} $label ($b)"
+			ok "$label ($b)"
 			return 0
 		fi
 	done
-	echo -e "  ${FAIL} $label"
+	fail "$label"
 	return 1
 }
 
@@ -150,6 +156,7 @@ os_detect() {
 			echo "linux-unknown"
 		fi
 		;;
+	Darwin) echo "macos" ;;
 	*) echo "unknown" ;;
 	esac
 }
@@ -181,23 +188,23 @@ refresh_pkg() {
 install_pkg() {
 	if ! $INSTALL_MODE; then return 1; fi
 	refresh_pkg
-	local _rc=0
+	local rc=0
 	case "$OS" in
-	debian | ubuntu) sudo_cmd apt-get install -y "$@" || _rc=1 ;;
-	arch) sudo_cmd pacman -S --noconfirm "$@" || _rc=1 ;;
-	opensuse) sudo_cmd zypper --non-interactive install -y "$@" || _rc=1 ;;
+	debian | ubuntu) sudo_cmd apt-get install -y "$@" ;;
+	arch) sudo_cmd pacman -S --noconfirm "$@" ;;
+	opensuse) sudo_cmd zypper --non-interactive install -y "$@" ;;
 	centos)
 		# Some of the tools come from EPEL on the RHEL/Fedora family.
 		sudo_cmd dnf install -y epel-release || true
-		sudo_cmd dnf install -y "$@" || _rc=1
+		sudo_cmd dnf install -y "$@"
 		;;
 	*) return 1 ;;
-	esac
+	esac || rc=$?
 	# Re-scan PATH: fresh binaries must not be shadowed by bash's
-	# per-process command hash cache. Run AFTER capturing _rc — hash -r
+	# per-process command hash cache. Run AFTER capturing rc — hash -r
 	# must not mask the install status.
 	hash -r
-	return "$_rc"
+	return "$rc"
 }
 
 get_install_hint() {
@@ -314,24 +321,24 @@ print_header() {
 			major=${ver%%.*}
 			minor=$(echo "$ver" | cut -d. -f2)
 			if ((major > 0 || (major == 0 && minor >= 55))); then
-				echo -e "  ${PASS} Hyprland ${ver}"
+				ok "Hyprland ${ver}"
 			else
-				echo -e "  ${FAIL} Hyprland ${ver} (need >= 0.55 for Lua config support)"
-				ALL_PASSED=false
+				fail "Hyprland ${ver} (need >= 0.55 for Lua config support)"
+				REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
 			fi
 		else
-			echo -e "  ${PASS} Hyprland (version string unparsable: $(echo "$out" | head -1))"
+			ok "Hyprland (version string unparsable: $(echo "$out" | head -1))"
 		fi
 		if echo "$out" | grep -qi lua; then
-			echo -e "  ${PASS} Lua config support built in"
+			ok "Lua config support built in"
 		else
-			echo -e "  ${WARN} version string does not mention Lua — check that your build supports the hl Lua config API"
+			warn "version string does not mention Lua — check that your build supports the hl Lua config API"
 		fi
 	elif have_native_cmd hyprctl; then
-		echo -e "  ${WARN} Hyprland binary not found, but hyprctl is available"
+		warn "Hyprland binary not found, but hyprctl is available"
 	else
-		echo -e "  ${FAIL} Hyprland (not found)"
-		ALL_PASSED=false
+		fail "Hyprland (not found)"
+		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
 	fi
 	echo ""
 }
@@ -344,7 +351,7 @@ print_platform() {
 	opensuse) echo -e "  Package manager: ${CYAN}zypper${NC}" ;;
 	centos) echo -e "  Package manager: ${CYAN}dnf${NC}" ;;
 	arch) echo -e "  Package manager: ${CYAN}pacman${NC}" ;;
-	*) echo -e "  ${WARN} Unsupported OS — install dependencies manually" ;;
+	*) warn "Unsupported OS — install dependencies manually" ;;
 	esac
 	echo ""
 }
@@ -388,10 +395,10 @@ install_missing_required() {
 		MISSING_REQUIRED=()
 		for b in "${REQUIRED_BINS[@]}" "${REQUIRED_EXT_BINS[@]}"; do
 			if bin_req_ok "$b"; then
-				echo -e "  ${PASS} $(dep_name "$b") installed"
+				ok "$(dep_name "$b") installed"
 			else
 				MISSING_REQUIRED+=("$b")
-				echo -e "  ${FAIL} $(dep_name "$b") still missing"
+				fail "$(dep_name "$b") still missing"
 			fi
 		done
 		if [[ ${#MISSING_REQUIRED[@]} -eq 0 ]]; then
@@ -440,9 +447,9 @@ check_fonts() {
 	echo -e "${BOLD}Fonts (optional)${NC}"
 	echo "  (waybar icons use Nerd Font glyphs)"
 	if fc-list 2>/dev/null | grep -qi "nerd"; then
-		echo -e "  ${PASS} Nerd Font found"
+		ok "Nerd Font found"
 	else
-		echo -e "  ${WARN} No Nerd Font detected — waybar icons may render as boxes"
+		warn "No Nerd Font detected — waybar icons may render as boxes"
 		echo -e "    https://github.com/ryanoasis/nerd-fonts"
 	fi
 	echo ""
@@ -454,7 +461,7 @@ check_config_files() {
 	# chained run and burn all three retries. Standalone runs (the manual
 	# diagnosis entry point) still get the full check.
 	if $SKIP_CONFIG_CHECKS; then
-		echo -e "  ${WARN} config checks skipped (handled by the installer)"
+		warn "config checks skipped (handled by the installer)"
 		return 0
 	fi
 	echo -e "${BOLD}Config files${NC}"
@@ -469,43 +476,43 @@ check_config_files() {
 		local target
 		target=$(readlink -f "$hypr_dir" 2>/dev/null || readlink "$hypr_dir")
 		if [[ "$target" == "$script_dir" ]]; then
-			echo -e "  ${PASS} ~/.config/hypr → ${target}"
+			ok "~/.config/hypr → ${target}"
 		else
-			echo -e "  ${WARN} ~/.config/hypr → ${target} (not this repo: ${script_dir})"
+			warn "~/.config/hypr → ${target} (not this repo: ${script_dir})"
 		fi
 	elif [[ -d "$hypr_dir" ]]; then
-		echo -e "  ${WARN} ~/.config/hypr is a plain directory (old per-file links) — re-link: ln -sfn ${script_dir} ${hypr_dir}"
+		warn "~/.config/hypr is a plain directory (old per-file links) — re-link: ln -sfn ${script_dir} ${hypr_dir}"
 	else
-		echo -e "  ${FAIL} ~/.config/hypr not found (run: ln -sfn ${script_dir} ~/.config/hypr)"
-		ALL_PASSED=false
+		fail "~/.config/hypr not found (run: ln -sfn ${script_dir} ~/.config/hypr)"
+		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
 	fi
 
 	local waybar_dir="${HOME}/.config/waybar"
 	if [[ -L "$waybar_dir" ]]; then
 		local target
 		target=$(readlink -f "$waybar_dir" 2>/dev/null || readlink "$waybar_dir")
-		echo -e "  ${PASS} waybar → ${target}"
+		ok "waybar → ${target}"
 	elif [[ -f "$waybar_dir/config.jsonc" && -f "$waybar_dir/style.css" ]]; then
 		if [[ -f "${script_dir}/waybar/config.jsonc" && "$waybar_dir/config.jsonc" -ef "${script_dir}/waybar/config.jsonc" ]]; then
-			echo -e "  ${PASS} waybar → ${script_dir}/waybar"
+			ok "waybar → ${script_dir}/waybar"
 		else
-			echo -e "  ${WARN} waybar is a plain directory (not a symlink to ${script_dir}/waybar)"
+			warn "waybar is a plain directory (not a symlink to ${script_dir}/waybar)"
 		fi
 	else
-		echo -e "  ${FAIL} waybar config not found (run: ln -sfn ${script_dir}/waybar ~/.config/waybar)"
-		ALL_PASSED=false
+		fail "waybar config not found (run: ln -sfn ${script_dir}/waybar ~/.config/waybar)"
+		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
 	fi
 
 	if [[ -d "${HOME}/.config/wlogout" ]] || have_native_cmd wlogout; then
-		echo -e "  ${PASS} wlogout present (power menu)"
+		ok "wlogout present (power menu)"
 	else
-		echo -e "  ${WARN} wlogout config dir not found (waybar power button needs it)"
+		warn "wlogout config dir not found (waybar power button needs it)"
 	fi
 	echo ""
 }
 
 print_summary() {
-	if $ALL_PASSED; then
+	if [ "$REQUIRED_FAILURES" -eq 0 ]; then
 		echo -e "${GREEN}${BOLD}All required dependencies satisfied.${NC}"
 		exit 0
 	else
@@ -522,12 +529,13 @@ print_summary() {
 main() {
 	parse_args "$@"
 	OS=$(os_detect)
+	readonly OS
 	print_header
 	print_platform
 	check_required_tools
 	install_missing_required
 	if [[ ${#MISSING_REQUIRED[@]} -gt 0 ]]; then
-		ALL_PASSED=false
+		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
 	fi
 	check_recommended_tools
 	install_missing_recommended

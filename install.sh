@@ -13,19 +13,17 @@ set -euo pipefail
 # so the block lands above any tmux auto-start block).
 # ──────────────────────────────────────────────────────────────
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m'
 
-INSTALL_DIR="${INSTALL_DIR:-$HOME/Documents/monkey-hyprland}"
-SUDOERS_D_DIR="${SUDOERS_D_DIR:-/etc/sudoers.d}"
+readonly INSTALL_DIR="${INSTALL_DIR:-$HOME/Documents/monkey-hyprland}"
+readonly SUDOERS_D_DIR="${SUDOERS_D_DIR:-/etc/sudoers.d}"
 SUDO_NOPASSWD=0
-NOPASSWD_DROPIN="$SUDOERS_D_DIR/zz-monkey-hyprland-nopasswd"
-SUDO_BIN=""
-SUDO_KEEPALIVE_PID=""
+readonly NOPASSWD_DROPIN="$SUDOERS_D_DIR/zz-monkey-hyprland-nopasswd"
 AUTOSTART_FILES=""
 
 # Never let a missing HOME fail later under `set -u`.
@@ -61,19 +59,9 @@ os_detect() {
 			echo "linux-unknown"
 		fi
 		;;
-	*) echo "non-linux" ;;
+	Darwin) echo "macos" ;;
+	*) echo "unknown" ;;
 	esac
-}
-
-# WSL interop appends the WINDOWS PATH to ours, so tools installed on the
-# Windows side appear as /mnt/c/... shims. They are not Linux binaries —
-# treat /mnt/* resolutions as "not installed".
-have_native_cmd() {
-	command -v "$1" &>/dev/null || return 1
-	case "$(command -v "$1")" in
-	/mnt/*) return 1 ;; # WSL Windows-interop shim
-	esac
-	return 0
 }
 
 # True under WSL (1 or 2): both kernels carry "microsoft" in the release
@@ -85,6 +73,19 @@ is_wsl() {
 	esac
 }
 
+# WSL interop appends the WINDOWS PATH to ours, so tools installed on the
+# Windows side (node, python, sudo.exe, ...) appear as /mnt/c/... shims.
+# They are not Linux binaries and root's secure_path cannot see them —
+# treat /mnt/* resolutions as "not installed" so the real Linux packages
+# get installed instead.
+have_native_cmd() {
+	command -v "$1" &>/dev/null || return 1
+	case "$(command -v "$1")" in
+	/mnt/*) return 1 ;; # WSL Windows-interop shim
+	esac
+	return 0
+}
+
 # Absolute path to a LINUX sudo, or non-zero.
 native_sudo() {
 	local p
@@ -94,11 +95,12 @@ native_sudo() {
 }
 
 sudo_cmd() {
-	# Lazy re-auth: sudo tickets expire (and brew resets them) —
-	# re-authenticate proactively with an explanatory prompt instead of
-	# letting a command fail or spring a context-free password prompt.
-	# `-n true` never prompts; the interactive `-v` only runs when the
-	# ticket is actually gone.
+	# Lazy re-auth: Homebrew resets the sudo timestamp on EVERY invocation
+	# (brew.sh runs `sudo --reset-timestamp` at startup), so a ticket that
+	# was valid a minute ago can be dead here. Re-authenticate proactively
+	# with an explanatory prompt instead of letting the command fail or
+	# spring a context-free password prompt. `-n true` never prompts; the
+	# interactive `-v` only runs when the ticket is actually gone.
 	local sudo_bin
 	sudo_bin=$(native_sudo) || {
 		"$@"
@@ -111,19 +113,31 @@ sudo_cmd() {
 }
 
 OS=$(os_detect)
+readonly OS
 
 # ────────────────── sudo setup (auth + drop-ins + keepalive) ──────────────────
 
+SUDO_KEEPALIVE_PID=""
+SUDO_BIN=""
+
 cleanup_sudo() {
+	# Kill the keepalive (if running) and remove the temporary NOPASSWD
+	# drop-in. `sudo -n rm` works while NOPASSWD is still in place — the
+	# file grants it, so removal never needs a password. State flags are
+	# reset so a second call (explicit from main + the EXIT trap) is a
+	# no-op. The `|| true` guards matter under set -e: `wait` reports
+	# 128+SIGTERM for a killed keepalive and `kill` fails on an already
+	# dead one — either would abort the drop-in removal below.
 	if [ -n "$SUDO_KEEPALIVE_PID" ]; then
-		kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
-		wait "$SUDO_KEEPALIVE_PID" 2>/dev/null
+		kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+		wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+		SUDO_KEEPALIVE_PID=""
 	fi
 	if [ "$SUDO_NOPASSWD" -eq 1 ] && [ -n "$SUDO_BIN" ]; then
-		SUDO_NOPASSWD=0
 		"$SUDO_BIN" -n rm -f "$NOPASSWD_DROPIN" 2>/dev/null ||
 			warn "could not remove the NOPASSWD drop-in — remove it manually: sudo rm $NOPASSWD_DROPIN"
 	fi
+	SUDO_NOPASSWD=0
 }
 
 setup_sudo() {
@@ -165,7 +179,7 @@ setup_sudo() {
 	trap 'exit 143' TERM
 }
 
-# ────────────────── package manager helpers ──────────────────
+# ────────────────── package index refresh & install ──────────────────
 
 # Refresh the package index before installing (at most once per run;
 # never fatal).
@@ -187,8 +201,13 @@ refresh_pkg() {
 	return 0
 }
 
+# System package manager install. Returns non-zero when the OS is unknown
+# or the manager fails, so callers can report a manual-install hint or
+# fall back to other sources. Recycles bash's command hash so a freshly
+# installed binary resolves without re-exec-ing this script.
 install_pkg() {
 	refresh_pkg
+	local rc=0
 	case "$OS" in
 	debian) sudo_cmd apt-get install -y "$@" ;;
 	arch) sudo_cmd pacman -S --needed --noconfirm "$@" ;;
@@ -197,9 +216,10 @@ install_pkg() {
 		sudo_cmd dnf install -y epel-release || true
 		sudo_cmd dnf install -y "$@"
 		;;
-	*) return 1 ;;
-	esac
+	*) rc=1 ;;
+	esac || rc=$?
 	hash -r
+	return "$rc"
 }
 
 # ────────────────── Step 1: Hyprland from the distro repo ──────────────────
@@ -257,7 +277,8 @@ clone_monkey_hyprland() {
 		info "monkey-hyprland already exists at $INSTALL_DIR — pulling latest..."
 		git -C "$INSTALL_DIR" pull --ff-only || warn "git pull failed — keeping existing version."
 	elif [ -e "$INSTALL_DIR" ]; then
-		fail "$INSTALL_DIR exists but is not a git clone — remove it or set INSTALL_DIR."
+		# Existing non-git dir is fine (e.g. git clone with .git removed).
+		warn "$INSTALL_DIR exists but is not a git repository — using it as-is."
 	else
 		info "Cloning monkey-hyprland to $INSTALL_DIR..."
 		git clone https://github.com/QMonkey/monkey-hyprland.git "$INSTALL_DIR"
@@ -268,6 +289,13 @@ clone_monkey_hyprland() {
 # ────────────────── Step 3: checkhealth.sh --install ──────────────────
 
 run_checkhealth() {
+	# PATH preseed before detection: checkhealth runs as a subprocess and
+	# only inherits the current shell's env. The profile PATH blocks land
+	# LATER, so on a first run freshly go/cargo-installed binaries would be
+	# reported missing and re-installed by the retry loop. Export only —
+	# nothing is written to any profile here.
+	case ":$PATH:" in *":$HOME/go/bin:"*) ;; *) export PATH="$HOME/go/bin:$PATH" ;; esac
+	case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$HOME/.cargo/bin:$PATH" ;; esac
 	info "Running checkhealth.sh --install to install remaining dependencies..."
 	# Transient failures (network blips, apt locks) heal on retry; after the
 	# first pass everything installed is skipped, so retries are cheap.
@@ -414,7 +442,7 @@ main() {
 	echo -e "${BOLD}╚══════════════════════════════════════════╝${NC}"
 	echo ""
 
-	if [ "$OS" = "non-linux" ]; then
+	if [ "$OS" = "macos" ] || [ "$OS" = "unknown" ]; then
 		warn "Current system is not Linux — monkey-hyprland is Wayland/Linux-only, skipping."
 		exit 0
 	fi
@@ -447,8 +475,6 @@ main() {
 
 	setup_symlinks
 	echo ""
-
-	cleanup_sudo
 
 	echo -e "${GREEN}${BOLD}monkey-hyprland installation complete!${NC}"
 	echo ""
