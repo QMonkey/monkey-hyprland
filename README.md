@@ -127,6 +127,8 @@ One-liner (installs deps, clones this repo and links the configs):
 curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash
 ```
 
+> The one-liner needs `git` besides `curl` itself: the installer clones this repository into `~/Documents/monkey-hyprland` before it can install anything. If `git` is missing, the script stops with an error — install it with your system's package manager and re-run the same command.
+
 The installer also writes a **guarded autostart block** to your shell profile files (`~/.zprofile` for zsh; `~/.bash_profile` or `~/.profile` plus `~/.bashrc` for bash — the same profile files an `exec tmux` auto-start block occupies):
 
 ```bash
