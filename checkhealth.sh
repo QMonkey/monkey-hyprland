@@ -236,10 +236,19 @@ RECOMMENDED_CHECKS=(
 )
 
 # ──────────────────────── advisory ────────────────────────
+# hypr-rdp is reported here, never installed by this script: no repo carries
+# it, and the installer builds it from source (install_step_post_tool). An
+# RECOMMENDED_CHECKS entry would need install=none — and checks.sh prints a
+# red "✗ failed to install" for those — so an advisory section is the honest
+# fit. The credentials file matters as much as the binary: hyprland.lua's RDP
+# section refuses to start the server without it.
 # title|note|type|params|ok|incomplete|missing — the missing text carries its
 # own second line (the nerd-fonts URL).
 ADVISORY_SECTIONS=(
 	"Fonts (optional)|(waybar icons use Nerd Font glyphs)|nerdfont||Nerd Font found||No Nerd Font detected — waybar icons may render as boxes\n    https://github.com/ryanoasis/nerd-fonts"
+	"RDP server (optional)|(remote desktop on port 3389)|cmd|hypr-rdp|hypr-rdp available||hypr-rdp not installed — install.sh builds it from source\n    https://github.com/MuNeNICK/hypr-rdp#build-from-source"
+	"RDP config template (optional)|(hyprland.lua renders config.toml from it)|path|$HOME/.config/hypr/rdp/config.toml.in|template present||hypr-rdp will not start until the template exists"
+	"RDP credentials (optional)|(hypr-rdp will not start without it)|path|$HOME/.config/hypr-rdp/credentials|credentials present||no password file — hypr-rdp will not start until one exists\n    run install.sh, which generates one"
 )
 
 # ──────────────────────── config ────────────────────────
