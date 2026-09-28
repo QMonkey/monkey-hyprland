@@ -1,0 +1,16 @@
+# Template for hypr-rdp. Rendered to ~/.config/hypr-rdp/config.toml by the RDP
+# section of hyprland.lua on every Hyprland start, which substitutes the
+# values below from the running session (monitor list and $USER).
+#
+# Edit this file, not the rendered config.toml. Paths must end up absolute:
+# hypr-rdp does not expand ~.
+#
+# No resolution: setting it pins resolution_fixed, which makes hypr-rdp ignore
+# the client's desktop size and live resizes. Omitting it lets the client pick,
+# capped to the source by normalize_presentation_size.
+
+bind = "0.0.0.0:3389"
+username = "@@USERNAME@@"
+password_file = "@@PASSWORD_FILE@@"
+fps = 30
+output = "@@OUTPUT@@"
