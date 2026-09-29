@@ -126,15 +126,15 @@ install_pkg() {
 	refresh_pkg
 	local rc=0
 	case "$OS" in
-	debian | ubuntu) retry -s "apt-get install" sudo_cmd apt-get install -y "$@" ;;
-	arch) retry -s "pacman install" sudo_cmd pacman -S --needed --noconfirm "$@" ;;
-	opensuse) retry -s "zypper install" sudo_cmd zypper --non-interactive install -y "$@" ;;
+	debian | ubuntu) retry -t 1800 -s "apt-get install" sudo_cmd apt-get install -y "$@" ;;
+	arch) retry -t 1800 -s "pacman install" sudo_cmd pacman -S --needed --noconfirm "$@" ;;
+	opensuse) retry -t 1800 -s "zypper install" sudo_cmd zypper --non-interactive install -y "$@" ;;
 	centos)
 		sudo_cmd dnf install -y epel-release || true
-		retry -s "dnf install" sudo_cmd dnf install -y "$@"
+		retry -t 1800 -s "dnf install" sudo_cmd dnf install -y "$@"
 		;;
 	fedora)
-		retry -s "dnf install" sudo_cmd dnf install -y "$@"
+		retry -t 1800 -s "dnf install" sudo_cmd dnf install -y "$@"
 		;;
 	*) rc=1 ;;
 	esac || rc=$?
@@ -249,7 +249,7 @@ clone_hypr_rdp() {
 		# before giving up, but only when git created it (.git inside) or it
 		# is empty, never when it holds pre-existing user data.
 		info "Cloning hypr-rdp to $HYPR_RDP_SRC_DIR..."
-		if ! retry -s "git clone hypr-rdp" git clone https://github.com/MuNeNICK/hypr-rdp.git "$HYPR_RDP_SRC_DIR"; then
+		if ! retry -t 1800 -s "git clone hypr-rdp" git clone https://github.com/MuNeNICK/hypr-rdp.git "$HYPR_RDP_SRC_DIR"; then
 			if [ -d "$HYPR_RDP_SRC_DIR" ] && { [ -z "$(ls -A "$HYPR_RDP_SRC_DIR")" ] || [ -d "$HYPR_RDP_SRC_DIR/.git" ]; }; then
 				rm -rf "$HYPR_RDP_SRC_DIR"
 			fi
@@ -261,7 +261,7 @@ clone_hypr_rdp() {
 
 build_hypr_rdp() {
 	info "Building hypr-rdp (release). This takes several minutes..."
-	(cd "$HYPR_RDP_SRC_DIR" && cargo build --release --locked) || {
+	(cd "$HYPR_RDP_SRC_DIR" && retry -t 1800 -s "cargo build hypr-rdp" cargo build --release --locked) || {
 		warn "cargo build failed."
 		return 1
 	}
