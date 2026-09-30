@@ -27,7 +27,11 @@ print_header_extra() {
 	if have_native_cmd Hyprland; then
 		local out ver major minor
 		out=$(Hyprland --version 2>/dev/null)
-		ver=$(echo "$out" | grep -m1 -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || true)
+		# head -n1: the version line can carry the number twice and -o prints
+		# EVERY match on it — "0.56.2\n0.56.2" then reached the arithmetic
+		# compare and died with a syntax error, always failing the check
+		# (observed on Hyprland 0.56.2 during the 2026-09 install run).
+		ver=$(echo "$out" | grep -m1 -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
 		if [[ -n "$ver" ]]; then
 			major=${ver%%.*}
 			minor=$(echo "$ver" | cut -d. -f2)
