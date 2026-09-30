@@ -375,6 +375,14 @@ install_step_autostart() {
 	command -v start-hyprland >/dev/null 2>&1 && launcher=start-hyprland
 	# pgrep matches the compositor process name, not the launcher: the
 	# start-hyprland watchdog execs into Hyprland either way.
+	if [ -n "$KMSCON_TTYS" ]; then
+		if is_wsl; then
+			warn "WSL detected — skipping kmscon setup (no VT login)."
+		else
+			ensure_kmscon "$KMSCON_TTYS" || warn "kmscon setup failed — continuing without it."
+			KMSCON_DONE=1
+		fi
+	fi
 	write_tty_autostart "$launcher" Hyprland
 	echo ""
 	if [ -n "$AUTOSTART_FILES" ]; then
@@ -383,6 +391,13 @@ install_step_autostart() {
 			"${SUMMARY_LINES[1]}"
 			"  Autostart: a VT login execs ${CYAN}${launcher}${NC} unless Hyprland is already running (block in:${CYAN}${AUTOSTART_FILES}${NC})"
 			"${SUMMARY_LINES[2]}"
+		)
+	fi
+	if [ -n "$KMSCON_DONE" ]; then
+		SUMMARY_LINES=(
+			"${SUMMARY_LINES[@]:0:${#SUMMARY_LINES[@]}-1}"
+			"  kmscon: fallback console on ${CYAN}${KMSCON_TTYS}${NC} — switch with chvt N"
+			"${SUMMARY_LINES[-1]}"
 		)
 	fi
 }
@@ -416,4 +431,32 @@ setup_symlinks() {
 	link_config "$INSTALL_DIR/wlogout" "$HOME/.config/wlogout"
 }
 
-install_main "$@"
+# ──────────────────────── optional kmscon takeover ────────────────────────
+# --with-kmscon [tty[,tty...]] hands the listed VTs to kmscon (default
+# tty2) and masks the matching getty instances — ensure_kmscon in
+# scripts/lib/kmscon.sh does the work. The flag stays local to this
+# installer: it is parsed out here and never reaches install_main.
+parse_install_args() {
+	KMSCON_TTYS=""
+	KMSCON_DONE=""
+	local args=()
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--with-kmscon)
+			KMSCON_TTYS=tty2
+			if [[ $# -gt 1 && "$2" != --* ]]; then
+				KMSCON_TTYS=$2
+				shift
+			fi
+			;;
+		*) args+=("$1") ;;
+		esac
+		shift
+	done
+	_INSTALL_ARGS=("${args[@]+"${args[@]}"}")
+}
+
+# --with-kmscon flag stays local: the parser fills _INSTALL_ARGS in this
+# shell and install_main never sees the flag.
+parse_install_args "$@"
+install_main "${_INSTALL_ARGS[@]+"${_INSTALL_ARGS[@]}"}"
