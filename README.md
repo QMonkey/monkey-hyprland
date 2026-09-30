@@ -277,6 +277,25 @@ its own session target; only HUP immunity is added. Two things to know:
   prompt rather than the login prompt, because the `exec` in the auto-start
   block no longer applies.
 
+### Optional: kmscon console (fallback tty)
+
+`install.sh --with-kmscon [tty[,tty...]]` hands the listed VTs to kmscon — a
+userspace console with a real font/renderer — and masks the matching `getty`
+instances there. Bare getty stays on all other VTs as the last resort if the
+DRM setup fails. Inside a kmscon session the autostart block wraps the
+compositor in `kmscon-launch-gui` from the distro kmscon package.
+
+The default is `tty2`; pass one or more VTs separated by commas:
+
+```bash
+bash install.sh --with-kmscon            # tty2
+bash install.sh --with-kmscon tty1       # primary login VT (no display manager)
+bash install.sh --with-kmscon tty1,tty2
+curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash -s -- --with-kmscon tty1,tty2
+```
+
+> Pass `tty1` only when no display manager owns it — a DM on its login VT and kmscon on the same VT will fight over the seat.
+
 ### 5. Update project
 
 ```bash
