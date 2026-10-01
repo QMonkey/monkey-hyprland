@@ -30,7 +30,7 @@ print_header_extra() {
 		# head -n1: the version line can carry the number twice and -o prints
 		# EVERY match on it — "0.56.2\n0.56.2" then reached the arithmetic
 		# compare and died with a syntax error, always failing the check
-		# (observed on Hyprland 0.56.2 during the 2026-09 install run).
+		# (observed on Hyprland 0.56.2).
 		ver=$(echo "$out" | grep -m1 -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
 		if [[ -n "$ver" ]]; then
 			major=${ver%%.*}
