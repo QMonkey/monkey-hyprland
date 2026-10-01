@@ -279,9 +279,12 @@ setup_rdp_credentials() {
 		return 0
 	fi
 	if ! have_native_cmd openssl; then
-		warn "openssl not found — create the RDP password yourself:"
+		# NEVER fatal: hypr-rdp is optional and simply won't start until a
+		# password exists — killing the whole component over it cost
+		# monkey-hyprland on CentOS/Fedora (no openssl CLI there).
+		warn "openssl not found — hypr-rdp stays disabled until you create the RDP password yourself:"
 		warn "  mkdir -p $dir && chmod 700 $dir && echo your-password >$file && chmod 600 $file"
-		return 1
+		return 0
 	fi
 	mkdir -p "$dir"
 	chmod 700 "$dir"
