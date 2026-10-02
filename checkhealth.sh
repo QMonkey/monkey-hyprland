@@ -141,90 +141,17 @@ bin_req_ok() {
 # from the binary name need a case arm; everything else falls through.
 # Keyed by $OS: one id per distro. Ubuntu keeps hyprland-qtutils while
 # Debian names it hyprland-guiutils, and Fedora has its own dnf row.
-pkg_name() {
-	local bin="$1"
-	case "$OS:$bin" in
-	# The GUI dialog helpers (upstream hyprland-qtutils): Debian, Arch and
-	# openSUSE name the binary package hyprland-guiutils, Ubuntu
-	# hyprland-qtutils.
-	# Coverage varies per release (Ubuntu < 26.04, Debian trixie: absent)
-	# — the availability probe degrades gracefully when missing.
-	ubuntu:hyprland-dialog) echo "hyprland-qtutils" ;;
-	debian:hyprland-dialog) echo "hyprland-guiutils" ;;
-	arch:hyprland-dialog) echo "hyprland-guiutils" ;;
-	opensuse:hyprland-dialog) echo "hyprland-guiutils" ;;
-	# Sentinel: notification daemon — install mako by default
-	# debian/ubuntu: the package is named mako-notifier and dunst is present
-	# everywhere — dunst is the safe default. EPEL: dunst only.
-	debian:notif | ubuntu:notif | centos:notif | fedora:notif) echo "dunst" ;;
-	*:notif) echo "mako" ;;
-	# hyprctl ships inside the compositor package on every distro
-	*:hyprctl) echo "hyprland" ;;
-	# Debian / apt
-	debian:wl-copy) echo "wl-clipboard" ;;
-	debian:wpctl) echo "wireplumber" ;;
-	debian:nm-applet) echo "network-manager-gnome" ;;
-	# nm-connection-editor is a binary of network-manager-gnome on
-	# Debian/Ubuntu — there is no separate package
-	debian:nm-connection-editor) echo "network-manager-gnome" ;;
-	# Ubuntu / apt: same package names as Debian
-	ubuntu:wl-copy) echo "wl-clipboard" ;;
-	ubuntu:wpctl) echo "wireplumber" ;;
-	ubuntu:nm-applet) echo "network-manager-gnome" ;;
-	ubuntu:nm-connection-editor) echo "network-manager-gnome" ;;
-	# Arch / pacman
-	arch:wl-copy) echo "wl-clipboard" ;;
-	arch:wpctl) echo "wireplumber" ;;
-	arch:nm-applet) echo "network-manager-applet" ;;
-	arch:nm-connection-editor) echo "nm-connection-editor" ;;
-	# openSUSE / zypper
-	opensuse:wl-copy) echo "wl-clipboard" ;;
-	opensuse:wpctl) echo "wireplumber" ;;
-	opensuse:nm-applet) echo "NetworkManager-applet" ;;
-	opensuse:nm-connection-editor) echo "NetworkManager-connection-editor" ;;
-	# dnf distros: nm-applet ships in the nm-connection-editor package —
-	# "NetworkManager-applet" is not a real binary name
-	centos:wl-copy | fedora:wl-copy) echo "wl-clipboard" ;;
-	centos:wpctl | fedora:wpctl) echo "wireplumber" ;;
-	centos:nm-applet | fedora:nm-applet) echo "nm-connection-editor" ;;
-	*)
-		default_pkg_name "$bin"
-		;;
-	esac
-}
 
 # ──────────────────────── required install ────────────────────────
 # Upstream re-probes EVERY binary after the batch install (one "installed" /
-# "still missing" line each) instead of re-printing the whole section, and
-# keeps a single failure verdict — hence this override of the shared step.
-install_missing_required() {
-	${INSTALL_MODE:-false} || return 0
-	[ ${#MISSING_REQUIRED[@]} -gt 0 ] || return 0
-	echo -e "${YELLOW}Installing: ${MISSING_REQUIRED[*]}...${NC}"
-	local pkgs=() b
-	for b in "${MISSING_REQUIRED[@]}"; do pkgs+=("$(pkg_name "$b")"); done
-	if install_pkg "${pkgs[@]}"; then
-		MISSING_REQUIRED=()
-		REQUIRED_FAILURES=0 # verdict is recomputed from the re-probe below
-		for b in "${REQUIRED_BINS[@]}" "${REQUIRED_EXT_BINS[@]}"; do
-			if bin_req_ok "$b"; then
-				ok "$(dep_name "$b") installed"
-			else
-				MISSING_REQUIRED+=("$b")
-				fail "$(dep_name "$b") still missing"
-				REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
-			fi
-		done
-		if [ ${#MISSING_REQUIRED[@]} -eq 0 ]; then
-			echo -e "${GREEN}All required tools now available.${NC}"
-		else
-			echo -e "${RED}Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock), xdg-desktop-portal-hyprland, hyprpolkitagent, hyprpaper, hypridle (on Arch all of these are in the official repo)${NC}"
-		fi
-	else
-		echo -e "${RED}Install command failed. Run: $(get_install_hint "${pkgs[*]}")${NC}"
-	fi
-	echo ""
-}
+# "still missing" line each) instead of re-printing the whole section —
+# REQUIRED_REPROBE_LIST + REQUIRED_NAME_FN + REQUIRED_MANUAL_HINT reproduce
+# that via the shared install_missing_required (monkey-scripts/lib/checks.sh).
+# Package-name mapping lives in the shared lib/pkg.sh table.
+REQUIRED_REPROBE_LIST=("${REQUIRED_BINS[@]}" "${REQUIRED_EXT_BINS[@]}")
+REQUIRED_REPROBE_FN=bin_req_ok
+REQUIRED_NAME_FN=dep_name
+REQUIRED_MANUAL_HINT="Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock), xdg-desktop-portal-hyprland, hyprpolkitagent, hyprpaper, hypridle (on Arch all of these are in the official repo)"
 
 # ──────────────────────── recommended ────────────────────────
 RECOMMENDED_NOTE="(Missing won't block monkey-hyprland, but will degrade tray / lock / brightness / gui-dialog experience)"
