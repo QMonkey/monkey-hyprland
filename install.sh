@@ -244,25 +244,7 @@ hypr_rdp_deps() {
 # puts ~/.cargo/bin on PATH, so plain `cargo` resolves afterwards.
 
 clone_hypr_rdp() {
-	if [ -d "$HYPR_RDP_SRC_DIR/.git" ]; then
-		info "hypr-rdp source at $HYPR_RDP_SRC_DIR — pulling latest..."
-		retry -s "git pull" git -C "$HYPR_RDP_SRC_DIR" pull --ff-only ||
-			warn "git pull failed — building the existing checkout."
-	elif [ -e "$HYPR_RDP_SRC_DIR" ]; then
-		warn "$HYPR_RDP_SRC_DIR exists but is not a git clone — leaving it untouched."
-		return 1
-	else
-		# A failed clone leaves a partial directory behind — clean it up
-		# before giving up, but only when git created it (.git inside) or it
-		# is empty, never when it holds pre-existing user data.
-		info "Cloning hypr-rdp to $HYPR_RDP_SRC_DIR..."
-		if ! retry -t 1800 -s "git clone hypr-rdp" git clone https://github.com/MuNeNICK/hypr-rdp.git "$HYPR_RDP_SRC_DIR"; then
-			if [ -d "$HYPR_RDP_SRC_DIR" ] && { [ -z "$(ls -A "$HYPR_RDP_SRC_DIR")" ] || [ -d "$HYPR_RDP_SRC_DIR/.git" ]; }; then
-				rm -rf "$HYPR_RDP_SRC_DIR"
-			fi
-			return 1
-		fi
-	fi
+	clone_repo https://github.com/MuNeNICK/hypr-rdp.git "$HYPR_RDP_SRC_DIR" || return 1
 	ok "hypr-rdp source ready."
 }
 
