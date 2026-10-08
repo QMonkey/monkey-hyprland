@@ -122,32 +122,16 @@ SUMMARY_LINES=(
 	"  Start Hyprland from a TTY (never under sudo/root): ${CYAN}start-hyprland${NC} (or ${CYAN}Hyprland${NC} on older builds)"
 	"  Update: ${CYAN}cd $INSTALL_DIR && git pull && hyprctl reload${NC}"
 )
+# hyprland's links are reported with the full destination path and never
+# re-created under an existing entry — that is the shared link_config's own
+# behaviour (lib/config.sh), so the links are plain SYMLINKS data.
+SYMLINKS=(
+	"$INSTALL_DIR|$HOME/.config/hypr"
+	"$INSTALL_DIR/waybar|$HOME/.config/waybar"
+	"$INSTALL_DIR/wlogout|$HOME/.config/wlogout"
+)
 
 # ──────────────────────── project steps ────────────────────────
-
-# Upstream installer semantics: skip packages the system already has
-# (pacman --needed). Overrides the shared install_pkg for this script only
-# (checkhealth.sh runs in its own process). Keys on OS, which is one
-# id per distro: Ubuntu and Fedora have their own rows here.
-install_pkg() {
-	refresh_pkg
-	local rc=0
-	case "$OS" in
-	debian | ubuntu) retry -t 1800 -s "apt-get install" sudo_cmd apt-get install -y "$@" ;;
-	arch) retry -t 1800 -s "pacman install" sudo_cmd pacman -S --needed --noconfirm "$@" ;;
-	opensuse) retry -t 1800 -s "zypper install" sudo_cmd zypper --non-interactive install -y "$@" ;;
-	centos)
-		sudo_cmd dnf install -y epel-release || true
-		retry -t 1800 -s "dnf install" sudo_cmd dnf install -y "$@"
-		;;
-	fedora)
-		retry -t 1800 -s "dnf install" sudo_cmd dnf install -y "$@"
-		;;
-	*) rc=1 ;;
-	esac || rc=$?
-	hash -r
-	return "$rc"
-}
 
 # Version of the hyprland package in the DISTRO REPO (not the installed
 # one): X.Y or empty when the repo has no such package.
@@ -368,11 +352,11 @@ install_step_autostart() {
 	# pgrep matches the compositor process name, not the launcher: the
 	# start-hyprland watchdog execs into Hyprland either way.
 	if [ -n "$KMSCON_TTYS" ]; then
-		if is_wsl; then
-			warn "WSL detected — skipping kmscon setup (no VT login)."
-		else
-			ensure_kmscon "$KMSCON_TTYS" || warn "kmscon setup failed — continuing without it."
+		# The WSL / non-Linux / no-KMS guards live in ensure_kmscon itself.
+		if ensure_kmscon "$KMSCON_TTYS"; then
 			KMSCON_DONE=1
+		else
+			warn "kmscon setup failed — continuing without it."
 		fi
 	fi
 	write_tty_autostart "$launcher" Hyprland
@@ -392,35 +376,6 @@ install_step_autostart() {
 			"${SUMMARY_LINES[-1]}"
 		)
 	fi
-}
-
-# hyprland's links are reported with the full destination path and never
-# re-created under an existing entry — the original's own helpers, kept
-# verbatim (they override the shared setup_symlinks / link_config).
-link_config() {
-	# Usage: link_config <src> <dst>. Never overwrites an existing target
-	# that is not this repo's link (ln -sfn into a real directory would
-	# create the link INSIDE it).
-	local src="$1" dst="$2"
-	if [ -e "$dst" ] || [ -L "$dst" ]; then
-		if [ -L "$dst" ] && [ "$(readlink -f "$dst")" = "$(readlink -f "$src")" ]; then
-			ok "$(basename "$dst") already linked."
-		else
-			warn "$dst exists and is not this repo's link — skipping."
-			echo -e "    re-link manually with: ${CYAN}ln -sfn $src $dst${NC}"
-		fi
-		return 0
-	fi
-	ln -sfn "$src" "$dst"
-	ok "$dst → $src"
-}
-
-setup_symlinks() {
-	info "Setting up configuration symlinks..."
-	mkdir -p "$HOME/.config"
-	link_config "$INSTALL_DIR" "$HOME/.config/hypr"
-	link_config "$INSTALL_DIR/waybar" "$HOME/.config/waybar"
-	link_config "$INSTALL_DIR/wlogout" "$HOME/.config/wlogout"
 }
 
 # ──────────────────────── optional kmscon takeover ────────────────────────
