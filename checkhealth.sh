@@ -46,6 +46,11 @@ print_header_extra() {
 		fi
 		if echo "$out" | grep -qi lua; then
 			ok "Lua config support built in"
+		elif [[ -n "$ver" ]] && ((major > 0 || (major == 0 && minor >= 55))); then
+			# 0.55+ ships the hl Lua config API in every build; the version
+			# string only mentions it on some builds (observed on 0.56.2),
+			# so the absence of the word is not evidence of absence.
+			ok "Lua config support assumed (>= 0.55; version string does not mention it)"
 		else
 			warn "version string does not mention Lua — check that your build supports the hl Lua config API"
 		fi
@@ -65,13 +70,6 @@ checkhealth_extra() {
 }
 
 # ──────────────────────── required ────────────────────────
-# Binary lists kept alongside the specs: the post-install re-probe below
-# walks them (not the spec list) and prints one line per binary.
-REQUIRED_BINS=(hyprctl waybar wezterm wofi grim slurp wl-copy wlogout wpctl hyprpaper hypridle fcitx5)
-# D-Bus services that may live outside PATH (/usr/lib, /usr/libexec).
-# "notif" is special: it accepts mako OR dunst.
-REQUIRED_EXT_BINS=(xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent notif)
-
 REQUIRED_CHECKS=(
 	"@header|Required tools"
 	"@note|(compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle/input method)"
@@ -93,64 +91,14 @@ REQUIRED_CHECKS=(
 	"notif|anyofext:mako dunst|notification daemon (mako/dunst)"
 )
 
-# Human-readable name for a dependency binary (used by the re-probe below).
-dep_name() {
-	case "$1" in
-	hyprctl) echo "hyprctl (ships with Hyprland)" ;;
-	wezterm) echo "wezterm (default terminal)" ;;
-	wofi) echo "wofi (app launcher)" ;;
-	grim) echo "grim (screenshot)" ;;
-	slurp) echo "slurp (region select)" ;;
-	wl-copy) echo "wl-clipboard (wl-copy)" ;;
-	wlogout) echo "wlogout (power menu)" ;;
-	wpctl) echo "wireplumber (wpctl)" ;;
-	hyprpaper) echo "hyprpaper (wallpaper)" ;;
-	hypridle) echo "hypridle (idle management)" ;;
-	fcitx5) echo "fcitx5 (input method framework)" ;;
-	xdg-desktop-portal-hyprland) echo "xdg-desktop-portal-hyprland (capture/sharing portal)" ;;
-	xdg-desktop-portal-gtk) echo "xdg-desktop-portal-gtk (file-chooser portal)" ;;
-	hyprpolkitagent) echo "hyprpolkitagent (polkit auth agent)" ;;
-	notif) echo "notification daemon (mako/dunst)" ;;
-	nm-applet) echo "nm-applet (tray network manager)" ;;
-	hyprlock) echo "hyprlock (lock screen)" ;;
-	hyprpicker) echo "hyprpicker (color picker)" ;;
-	hyprsunset) echo "hyprsunset (color temperature)" ;;
-	nm-connection-editor) echo "nm-connection-editor" ;;
-	hyprland-dialog) echo "hyprland-guiutils (GUI helper dialogs/run/welcome)" ;;
-	*) echo "$1" ;;
-	esac
-}
-
-# Pure availability test used after --install: PATH or /usr/lib* lookup.
-# "notif" accepts either notification daemon.
-bin_req_ok() {
-	local b="$1" p
-	if [ "$b" = "notif" ]; then
-		have_native_cmd mako && return 0
-		have_native_cmd dunst && return 0
-		return 1
-	fi
-	if have_native_cmd "$b"; then return 0; fi
-	for p in "/usr/lib/$b" "/usr/libexec/$b"; do
-		[ -x "$p" ] && return 0
-	done
-	return 1
-}
-
-# Package name for a binary on the detected OS. Only entries that differ
-# from the binary name need a case arm; everything else falls through.
-# Keyed by $OS: one id per distro. Ubuntu keeps hyprland-qtutils while
-# Debian names it hyprland-guiutils, and Fedora has its own dnf row.
-
 # ──────────────────────── required install ────────────────────────
-# Upstream re-probes EVERY binary after the batch install (one "installed" /
-# "still missing" line each) instead of re-printing the whole section —
-# REQUIRED_REPROBE_LIST + REQUIRED_NAME_FN + REQUIRED_MANUAL_HINT reproduce
-# that via the shared install_missing_required (monkey-scripts/lib/checks.sh).
-# Package-name mapping lives in the shared lib/pkg.sh table.
-REQUIRED_REPROBE_LIST=("${REQUIRED_BINS[@]}" "${REQUIRED_EXT_BINS[@]}")
-REQUIRED_REPROBE_FN=bin_req_ok
-REQUIRED_NAME_FN=dep_name
+# The post-install re-probe walks the specs themselves (one "installed" /
+# "still missing" line each, anyof/anyofext semantics included) instead of
+# re-printing the whole section — REQUIRED_REPROBE_LIST with spec entries +
+# REQUIRED_MANUAL_HINT reproduce that via the shared install_missing_required
+# (monkey-scripts/lib/checks.sh). Package-name mapping lives in the shared
+# lib/pkg.sh table.
+REQUIRED_REPROBE_LIST=("${REQUIRED_CHECKS[@]}")
 REQUIRED_MANUAL_HINT="Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock), xdg-desktop-portal-hyprland, hyprpolkitagent, hyprpaper, hypridle (on Arch all of these are in the official repo)"
 
 # ──────────────────────── recommended ────────────────────────
@@ -183,63 +131,16 @@ ADVISORY_SECTIONS=(
 )
 
 # ──────────────────────── config ────────────────────────
-# hyprland's config check is its own: the whole repo is linked as
-# ~/.config/hypr, waybar/wlogout are separate. Overrides the shared
-# check_config_files after sourcing.
-check_config_files() {
-	# --skip-check-config (passed by install.sh): the config symlinks are
-	# linked AFTER this script runs, so judging them here would fail every
-	# chained run and burn all three retries. Standalone runs (the manual
-	# diagnosis entry point) still get the full check.
-	if $SKIP_CONFIG_CHECKS; then
-		warn "config checks skipped (handled by the installer)"
-		return 0
-	fi
-	echo -e "${BOLD}Config files${NC}"
-	local script_dir
-	script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-
-	# The whole repo is expected to be linked as ~/.config/hypr (single dir
-	# link covers hyprland.lua, hypr*.conf and pictures/). waybar/wlogout
-	# are checked separately below.
-	local hypr_dir="${HOME}/.config/hypr"
-	if [[ -L "$hypr_dir" ]]; then
-		local target
-		target=$(readlink -f "$hypr_dir" 2>/dev/null || readlink "$hypr_dir")
-		if [[ "$target" == "$script_dir" ]]; then
-			ok "~/.config/hypr → ${target}"
-		else
-			warn "~/.config/hypr → ${target} (not this repo: ${script_dir})"
-		fi
-	elif [[ -d "$hypr_dir" ]]; then
-		warn "~/.config/hypr is a plain directory (old per-file links) — re-link: ln -sfn ${script_dir} ${hypr_dir}"
-	else
-		fail "~/.config/hypr not found (run: ln -sfn ${script_dir} ~/.config/hypr)"
-		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
-	fi
-
-	local waybar_dir="${HOME}/.config/waybar"
-	if [[ -L "$waybar_dir" ]]; then
-		local target
-		target=$(readlink -f "$waybar_dir" 2>/dev/null || readlink "$waybar_dir")
-		ok "waybar → ${target}"
-	elif [[ -f "$waybar_dir/config.jsonc" && -f "$waybar_dir/style.css" ]]; then
-		if [[ -f "${script_dir}/waybar/config.jsonc" && "$waybar_dir/config.jsonc" -ef "${script_dir}/waybar/config.jsonc" ]]; then
-			ok "waybar → ${script_dir}/waybar"
-		else
-			warn "waybar is a plain directory (not a symlink to ${script_dir}/waybar)"
-		fi
-	else
-		fail "waybar config not found (run: ln -sfn ${script_dir}/waybar ~/.config/waybar)"
-		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
-	fi
-
-	if [[ -d "${HOME}/.config/wlogout" ]] || have_native_cmd wlogout; then
-		ok "wlogout present (power menu)"
-	else
-		warn "wlogout config dir not found (waybar power button needs it)"
-	fi
-	echo ""
-}
+# src|dst|desc|mode|name|hint — hypr uses "strict" (the whole repo linked as
+# ~/.config/hypr must resolve into THIS checkout); waybar accepts any symlink.
+REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+CONFIG_LINKS=(
+	"$REPO_DIR|$HOME/.config/hypr|~/.config/hypr|strict||~/.config/hypr not found (run: ln -sfn $REPO_DIR ~/.config/hypr)"
+	"$REPO_DIR/waybar|$HOME/.config/waybar|waybar|||waybar config not found (run: ln -sfn $REPO_DIR/waybar ~/.config/waybar)"
+)
+# type|params|ok|incomplete|missing
+CONFIG_HINTS=(
+	"any|$HOME/.config/wlogout wlogout|wlogout present (power menu)||wlogout config dir not found (waybar power button needs it)"
+)
 
 checkhealth_main "$@"
