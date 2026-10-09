@@ -17,57 +17,15 @@ set -euo pipefail
 # ──────────────────────── identity ────────────────────────
 PROJECT=monkey-hyprland
 
-# ──────────────────────── Hyprland version probe ────────────────────────
-# Printed between the title and Platform (the original's print_header).
-# Failures cannot touch REQUIRED_FAILURES here — run_required_checks resets
-# the counter right after — so they are folded in by checkhealth_extra.
-HYPR_VERSION_FAILED=0
-print_header_extra() {
-	echo -e "${BOLD}Hyprland version${NC}"
-	if have_native_cmd Hyprland; then
-		local out ver major minor
-		out=$(Hyprland --version 2>/dev/null)
-		# head -n1: the version line can carry the number twice and -o prints
-		# EVERY match on it — "0.56.2\n0.56.2" then reached the arithmetic
-		# compare and died with a syntax error, always failing the check
-		# (observed on Hyprland 0.56.2).
-		ver=$(echo "$out" | grep -m1 -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1)
-		if [[ -n "$ver" ]]; then
-			major=${ver%%.*}
-			minor=$(echo "$ver" | cut -d. -f2)
-			if ((major > 0 || (major == 0 && minor >= 55))); then
-				ok "Hyprland ${ver}"
-			else
-				fail "Hyprland ${ver} (need >= 0.55 for Lua config support)"
-				HYPR_VERSION_FAILED=1
-			fi
-		else
-			ok "Hyprland (version string unparsable: $(echo "$out" | head -1))"
-		fi
-		if echo "$out" | grep -qi lua; then
-			ok "Lua config support built in"
-		elif [[ -n "$ver" ]] && ((major > 0 || (major == 0 && minor >= 55))); then
-			# 0.55+ ships the hl Lua config API in every build; the version
-			# string only mentions it on some builds (observed on 0.56.2),
-			# so the absence of the word is not evidence of absence.
-			ok "Lua config support assumed (>= 0.55; version string does not mention it)"
-		else
-			warn "version string does not mention Lua — check that your build supports the hl Lua config API"
-		fi
-	elif have_native_cmd hyprctl; then
-		warn "Hyprland binary not found, but hyprctl is available"
-	else
-		fail "Hyprland (not found)"
-		HYPR_VERSION_FAILED=1
-	fi
-	echo ""
-}
-
-checkhealth_extra() {
-	if [ "$HYPR_VERSION_FAILED" = 1 ]; then
-		REQUIRED_FAILURES=$((REQUIRED_FAILURES + 1))
-	fi
-}
+# ──────────────────────── version gate ────────────────────────
+# 0.55 is the first release with the hl Lua config API — the only config
+# format this repo ships — so the version gate IS the Lua-support check;
+# there is no separate "lua" token probe (some version strings don't
+# mention lua — e.g. 0.56.2 — while the API is always there).
+# The hyprctl fallback (6th field) turns a missing Hyprland binary with
+# hyprctl present into a warn instead of a fail.
+MAIN_VERSION="Hyprland|ver:0.55|Hyprland|none|[0-9]+\.[0-9]+(\.[0-9]+)?|hyprctl|"
+MAIN_VERSION_TITLE="Hyprland version"
 
 # ──────────────────────── required ────────────────────────
 REQUIRED_CHECKS=(
@@ -124,7 +82,7 @@ RECOMMENDED_CHECKS=(
 # title|note|type|params|ok|incomplete|missing — the missing text carries its
 # own second line (the nerd-fonts URL).
 ADVISORY_SECTIONS=(
-	"Fonts (optional)|(waybar icons use Nerd Font glyphs)|nerdfont||Nerd Font found||No Nerd Font detected — waybar icons may render as boxes\n    https://github.com/ryanoasis/nerd-fonts"
+	"$ADVISORY_NERDFONT"
 	"RDP server (optional)|(remote desktop on port 3389)|cmd|hypr-rdp|hypr-rdp available||hypr-rdp not installed — install.sh builds it from source\n    https://github.com/MuNeNICK/hypr-rdp#build-from-source"
 	"RDP config template (optional)|(hyprland.lua renders config.toml from it)|path|$HOME/.config/hypr/rdp/config.toml.in|template present||hypr-rdp will not start until the template exists"
 	"RDP credentials (optional)|(hypr-rdp will not start without it)|path|$HOME/.config/hypr-rdp/credentials|credentials present||no password file — hypr-rdp will not start until one exists\n    run install.sh, which generates one"
