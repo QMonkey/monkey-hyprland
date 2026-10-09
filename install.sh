@@ -29,10 +29,6 @@ PROJECT_REPO=https://github.com/QMonkey/monkey-hyprland.git
 INSTALL_DIR="${INSTALL_DIR:-$HOME/Documents/monkey-hyprland}"
 
 # No scripts/ next to this file: either a checkout predating the subtree
-# commit (pull it in and carry on) or `curl | bash`, which has no checkout
-# at all. The latter clones THIS project and runs the install.sh from that
-# checkout, so installer and scripts/ always come from the same revision.
-# No scripts/ next to this file: either a checkout predating the subtree
 # commit (pull it in and carry on), a .git-less directory (zip/tarball),
 # or `curl | bash`, which has no checkout at all. The latter two bootstrap
 # through INSTALL_DIR and run the install.sh from that checkout, so
@@ -133,19 +129,6 @@ SYMLINKS=(
 
 # ──────────────────────── project steps ────────────────────────
 
-# Version of the hyprland package in the DISTRO REPO (not the installed
-# one): X.Y or empty when the repo has no such package.
-repo_hyprland_version() {
-	local ver=""
-	case "$OS" in
-	debian | ubuntu) ver=$(apt-cache policy hyprland 2>/dev/null | awk '/Candidate:/{print $2}') ;;
-	arch) ver=$(LC_ALL=C pacman -Si hyprland 2>/dev/null | awk '/^Version[[:space:]]*:/ {print $3; exit}') ;;
-	opensuse) ver=$(LC_ALL=C zypper --non-interactive info hyprland 2>/dev/null | awk -F': *' '/^Version/{print $2; exit}') ;;
-	centos | fedora) ver=$(dnf -q list available hyprland 2>/dev/null | awk 'NR>1 {print $2; exit}') ;;
-	esac
-	printf '%s' "$ver" | grep -oE '^[0-9]+\.[0-9]+' || true
-}
-
 manual_build_hint() {
 	warn "Hyprland needs a manual build (requires gcc >= 16 or clang >= 19):"
 	warn "  https://wiki.hyprland.org/Getting-Started/Installation/#manual-build"
@@ -158,7 +141,10 @@ install_hyprland() {
 		return 0
 	fi
 	local ver
-	ver=$(repo_hyprland_version)
+	# Version of the hyprland package in the DISTRO REPO (not the installed
+	# one): X.Y or empty when the repo has no such package (shared
+	# repo_pkg_version, lib/pkg.sh).
+	ver=$(repo_pkg_version hyprland)
 	if [[ -z "$ver" ]]; then
 		warn "Hyprland is not available in the $OS repositories."
 		manual_build_hint
@@ -318,6 +304,7 @@ install_hypr_rdp() {
 	HYPR_RDP_INSTALLED=1
 }
 
+# ──────────────────────── hooks ────────────────────────
 # A hook prints its own trailing blank line when it produced output; the
 # upstream separates setup_sudo from the first step with its own blank.
 install_step_prepare() {
@@ -332,14 +319,10 @@ install_step_prepare() {
 install_step_post_tool() {
 	install_hypr_rdp
 	echo ""
-	local -a head=("${SUMMARY_LINES[@]:0:${#SUMMARY_LINES[@]}-1}")
-	SUMMARY_LINES=(
-		${head[@]+"${head[@]}"}
-		"?HYPR_RDP_INSTALLED|  RDP: ${CYAN}hypr-rdp${NC} autostarts with Hyprland and mirrors the focused monitor"
-		"?HYPR_RDP_INSTALLED|  Edit ${CYAN}$INSTALL_DIR/rdp/config.toml.in${NC} and log back in to re-render it"
+	summary_insert_at -1 \
+		"?HYPR_RDP_INSTALLED|  RDP: ${CYAN}hypr-rdp${NC} autostarts with Hyprland and mirrors the focused monitor" \
+		"?HYPR_RDP_INSTALLED|  Edit ${CYAN}$INSTALL_DIR/rdp/config.toml.in${NC} and log back in to re-render it" \
 		"?HYPR_RDP_INSTALLED|  Connect any RDP client to this host on port ${CYAN}3389${NC}"
-		"${SUMMARY_LINES[-1]}"
-	)
 }
 
 # The compositor autostart line of the summary depends on what
@@ -351,59 +334,23 @@ install_step_autostart() {
 	command -v start-hyprland >/dev/null 2>&1 && launcher=start-hyprland
 	# pgrep matches the compositor process name, not the launcher: the
 	# start-hyprland watchdog execs into Hyprland either way.
-	if [ -n "$KMSCON_TTYS" ]; then
-		# The WSL / non-Linux / no-KMS guards live in ensure_kmscon itself.
-		if ensure_kmscon "$KMSCON_TTYS"; then
-			KMSCON_DONE=1
-		else
-			warn "kmscon setup failed — continuing without it."
-		fi
-	fi
+	run_kmscon_setup
 	write_tty_autostart "$launcher" Hyprland
 	echo ""
 	if [ -n "$AUTOSTART_FILES" ]; then
-		SUMMARY_LINES=(
-			"${SUMMARY_LINES[0]}"
-			"${SUMMARY_LINES[1]}"
-			"  Autostart: a VT login execs ${CYAN}${launcher}${NC} unless Hyprland is already running (block in:${CYAN}${AUTOSTART_FILES}${NC})"
-			"${SUMMARY_LINES[2]}"
-		)
+		summary_insert_at 2 "  Autostart: a VT login execs ${CYAN}${launcher}${NC} unless Hyprland is already running (block in:${CYAN}${AUTOSTART_FILES}${NC})"
 	fi
 	if [ -n "$KMSCON_DONE" ]; then
-		SUMMARY_LINES=(
-			"${SUMMARY_LINES[@]:0:${#SUMMARY_LINES[@]}-1}"
-			"  kmscon: fallback console on ${CYAN}${KMSCON_TTYS}${NC} — switch with chvt N"
-			"${SUMMARY_LINES[-1]}"
-		)
+		summary_insert_at -1 "  kmscon: fallback console on ${CYAN}${KMSCON_TTYS}${NC} — switch with chvt N"
 	fi
 }
 
 # ──────────────────────── optional kmscon takeover ────────────────────────
-# --with-kmscon [tty[,tty...]] hands the listed VTs to kmscon (default
-# tty2) and masks the matching getty instances — ensure_kmscon in
-# scripts/lib/kmscon.sh does the work. The flag stays local to this
-# installer: it is parsed out here and never reaches install_main.
-parse_install_args() {
-	KMSCON_TTYS=""
-	KMSCON_DONE=""
-	local args=()
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		--with-kmscon)
-			KMSCON_TTYS=tty2
-			if [[ $# -gt 1 && "$2" != --* ]]; then
-				KMSCON_TTYS=$2
-				shift
-			fi
-			;;
-		*) args+=("$1") ;;
-		esac
-		shift
-	done
-	_INSTALL_ARGS=("${args[@]+"${args[@]}"}")
-}
+# --with-kmscon [tty[,tty...]] is parsed by the shared parse_install_args
+# (lib/kmscon.sh): it fills KMSCON_TTYS/KMSCON_DONE and _INSTALL_ARGS — the
+# flag never reaches install_main.
 
-# --with-kmscon flag stays local: the parser fills _INSTALL_ARGS in this
-# shell and install_main never sees the flag.
+# The flag stays local: the parser fills _INSTALL_ARGS in this shell and
+# install_main never sees it.
 parse_install_args "$@"
 install_main "${_INSTALL_ARGS[@]+"${_INSTALL_ARGS[@]}"}"
