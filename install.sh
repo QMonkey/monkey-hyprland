@@ -95,13 +95,8 @@ fi
 # shellcheck source=/dev/null
 . "$_monkey_scripts/install.sh"
 
-# scripts/install.sh loads five of the seven libs. The sixth, optional.sh (the
-# optional-tooling strategies: ensure_rust, ensure_npm, the cargo/go/pip
-# installers), is checkhealth-scoped there — but hypr-rdp is built from source
-# in this process and needs a Rust toolchain, so pull that lib in too, through
-# the path the bootstrap already resolved.
-# shellcheck source=/dev/null
-. "$_monkey_scripts/lib/optional.sh"
+# hypr-rdp is built from source in this process and needs a Rust toolchain;
+# ensure_rust lives in pkg.sh, which scripts/install.sh sources itself.
 
 # ──────────────────────── layout & data ────────────────────────
 LINUX_ONLY=1
@@ -209,9 +204,9 @@ hypr_rdp_deps() {
 }
 
 # hypr-rdp builds IronRDP from git and needs a current stable Rust, which
-# distro packages lag behind on. ensure_rust (scripts/lib/optional.sh) is the
-# framework's own: it installs rustup when absent, sources ~/.cargo/env and
-# puts ~/.cargo/bin on PATH, so plain `cargo` resolves afterwards.
+# distro packages lag behind on. ensure_rust (pkg.sh) is the framework's
+# own: it installs rustup when absent and puts ~/.cargo/bin on PATH, so
+# plain `cargo` resolves afterwards.
 
 clone_hypr_rdp() {
 	clone_repo https://github.com/MuNeNICK/hypr-rdp.git "$HYPR_RDP_SRC_DIR" || return 1
