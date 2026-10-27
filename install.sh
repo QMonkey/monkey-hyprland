@@ -96,7 +96,7 @@ fi
 . "$_monkey_scripts/install.sh"
 
 # hypr-rdp is built from source in this process and needs a Rust toolchain;
-# ensure_rust lives in pkg.sh, which scripts/install.sh sources itself.
+# ensure_rust lives in lib/toolchain.sh, which scripts/install.sh sources itself.
 
 # ──────────────────────── layout & data ────────────────────────
 LINUX_ONLY=1
@@ -177,25 +177,32 @@ hypr_rdp_deps() {
 	local deps
 	case "$OS" in
 	debian | ubuntu)
+		# pkg-config: NOT part of build-essential — libspa-sys and friends
+		# shell out to it on every platform.
 		deps=(
 			libpipewire-0.3-dev libva-dev libxkbcommon-dev
 			libwayland-dev libgbm-dev libpam0g-dev fuse3
-			build-essential libclang-dev
+			build-essential libclang-dev pkg-config
 		)
 		;;
-	arch) deps=(pipewire libva libxkbcommon wayland mesa pam fuse3 clang) ;;
+	arch)
+		# pkgconf provides /usr/bin/pkg-config; it normally rides in with
+		# base-devel, but base-devel only arrives via OTHER components'
+		# install batches — do not depend on their success here.
+		deps=(pipewire libva libxkbcommon wayland mesa pam fuse3 clang pkgconf)
+		;;
 	opensuse)
 		deps=(
 			pipewire-devel libva-devel libxkbcommon-devel
 			wayland-devel libgbm-devel pam-devel fuse3
-			gcc gcc-c++ clang
+			gcc gcc-c++ clang pkg-config
 		)
 		;;
 	centos | fedora)
 		deps=(
 			pipewire-devel libva-devel libxkbcommon-devel
 			wayland-devel mesa-libgbm-devel pam-devel fuse3
-			gcc gcc-c++ clang-devel
+			gcc gcc-c++ clang-devel pkgconfig
 		)
 		;;
 	*) return 1 ;;
@@ -204,7 +211,7 @@ hypr_rdp_deps() {
 }
 
 # hypr-rdp builds IronRDP from git and needs a current stable Rust, which
-# distro packages lag behind on. ensure_rust (pkg.sh) is the framework's
+# distro packages lag behind on. ensure_rust (lib/toolchain.sh) is the framework's
 # own: it installs rustup when absent and puts ~/.cargo/bin on PATH, so
 # plain `cargo` resolves afterwards.
 
@@ -342,7 +349,7 @@ install_step_autostart() {
 
 # ──────────────────────── optional kmscon takeover ────────────────────────
 # --with-kmscon [tty[,tty...]] is parsed by the shared parse_install_args
-# (lib/kmscon.sh): it fills KMSCON_TTYS/KMSCON_DONE and _INSTALL_ARGS — the
+# (install.sh entry point): it fills KMSCON_TTYS/KMSCON_DONE and _INSTALL_ARGS — the
 # flag never reaches install_main.
 
 # The flag stays local: the parser fills _INSTALL_ARGS in this shell and
