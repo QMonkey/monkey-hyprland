@@ -222,7 +222,7 @@ clone_hypr_rdp() {
 
 build_hypr_rdp() {
 	info "Building hypr-rdp (release). This takes several minutes..."
-	(cd "$HYPR_RDP_SRC_DIR" && retry -t 1800 -s "cargo build hypr-rdp" cargo build --release --locked) || {
+	(cd "$HYPR_RDP_SRC_DIR" && retry -t "$RETRY_T_HEAVY" -s "cargo build hypr-rdp" cargo build --release --locked) || {
 		warn "cargo build failed."
 		return 1
 	}
