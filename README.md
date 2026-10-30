@@ -124,7 +124,7 @@ Pass `--install` to automatically install missing dependencies. Supports apt/zyp
 One-liner (installs deps, clones this repo and links the configs):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash 2>&1 | tee monkey-hyprland-install.log
 ```
 
 > The one-liner needs `git` besides `curl` itself: the installer clones this repository into `~/Documents/monkey-hyprland` before it can install anything. If `git` is missing, the script stops with an error — install it with your system's package manager and re-run the same command.
@@ -291,7 +291,7 @@ The default is `tty2`; pass one or more VTs separated by commas:
 bash install.sh --with-kmscon            # tty2
 bash install.sh --with-kmscon tty1       # primary login VT (no display manager)
 bash install.sh --with-kmscon tty1,tty2
-curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash -s -- --with-kmscon tty1,tty2
+curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash -s -- --with-kmscon tty1,tty2 2>&1 | tee monkey-hyprland-install.log
 ```
 
 > Pass `tty1` only when no display manager owns it — a DM on its login VT and kmscon on the same VT will fight over the seat.
