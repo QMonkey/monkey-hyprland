@@ -138,8 +138,9 @@ install_hyprland() {
 	local ver
 	# Version of the hyprland package in the DISTRO REPO (not the installed
 	# one): X.Y or empty when the repo has no such package (shared
-	# repo_pkg_version, lib/pkg.sh).
-	ver=$(repo_pkg_version hyprland)
+	# pkg_version <lane> <name>, lib/pkg.sh — the door, so the
+	# lane stays decided in one place).
+	ver=$(pkg_version pkg hyprland)
 	if [[ -z "$ver" ]]; then
 		warn "Hyprland is not available in the $OS repositories."
 		manual_build_hint
