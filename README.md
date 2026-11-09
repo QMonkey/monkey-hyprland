@@ -14,14 +14,20 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | Auto monitor detect | Monitors are auto-detected on their EDID `preferred` (native) mode with auto position; scale defaults to `1.0` (set `scale` in `hyprland.lua`, e.g. `2.0` for HiDPI) |
 | Laptop aware        | Touchpad gestures and brightness keys are enabled automatically on battery machines                                                                                  |
 | Minimal animations  | Animations disabled for performance; subtle blur and shadows kept                                                                                                    |
-| waybar status bar   | Paired waybar config (workspaces, clock, tray, network, audio, battery, power menu)                                                                                  |
+| waybar status bar   | Paired waybar config (workspaces, clock, tray, audio, battery)                                                                                                       |
 | Wallpaper           | hyprpaper applies the bundled aurora image (`pictures/`) on every monitor via `hyprpaper.conf`                                                                       |
 
 ## Requirements
 
-- Hyprland **0.55.0+** (native Lua config support with the `hl` API landed in 0.55.0; the bundled build with Lua support can be verified with `Hyprland --version | grep -i lua`)
+- Hyprland **0.55.0+** (native Lua config support with the `hl` API landed in 0.55.0; check `Hyprland --version` for the version number — the string does not mention Lua even on builds that do carry the API, e.g. 0.56.2, so the number is the probe)
 - waybar
 - A Wayland session (this config is Wayland-only; no X11 fallback)
+- Linux: `install.sh` is `LINUX_ONLY`, so on macOS it stops with a warning
+  before any package question (and hypr-rdp's build-dependency table only
+  covers the supported distro ids). Inside WSL the run completes but skips the
+  two VT-only parts — the autostart block (`write_tty_autostart`) and
+  `--with-kmscon` (`ensure_kmscon`) both detect WSL and skip, since there is no
+  VT login and WSLg renders GUI apps directly.
 
 > If your distro's packaged Hyprland is older than 0.55.0, build it from source following the official wiki's [Manual build](https://wiki.hyprland.org/Getting-Started/Installation/#manual-build) section. Note the C++26 toolchain requirement (**gcc >= 16** or **clang >= 19**); always update via `git pull` + `git submodule update --init --recursive` + rebuild so the hypr* dependencies stay in sync with Hyprland.
 
@@ -31,27 +37,27 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 
 `install.sh` and `checkhealth.sh --install` install these automatically (apt/zypper/dnf/pacman). The tables below document what gets checked and why:
 
-> On Arch all required tools are in the official repos. On Debian/openSUSE/CentOS some tools (wezterm, hyprlock, xdg-desktop-portal-hyprland, hyprpolkitagent) may need a manual install or a source build — checkhealth reports each one.
+> On Arch every required tool is in the official repos except `wlogout`, which moved to the AUR — install.sh's `aur` lane builds it with `paru`. On Debian/CentOS some tools (wezterm, hyprlock, xdg-desktop-portal-hyprland, hyprpolkitagent) may need a manual install or a source build; openSUSE Tumbleweed carries the whole set (hyprlock/hyprpicker/hyprsunset included) in the standard OSS repo. checkhealth reports each one.
 
 #### Common tools
 
 | Tool                                        | Purpose                                                                    | Required |
 | ------------------------------------------- | -------------------------------------------------------------------------- | -------- |
 | Hyprland                                    | The compositor (must support the Lua `hl` config API)                      | Yes      |
-| [waybar](https://github.com/Alexays/Waybar) | Status bar (workspaces, tray, network, audio, battery)                     | Yes      |
+| [waybar](https://github.com/Alexays/Waybar) | Status bar (workspaces, clock, tray, audio, battery)                       | Yes      |
 | wezterm                                     | Default terminal emulator (`Super + Enter`)                                | Yes      |
 | wofi                                        | Application launcher (`Super + d`)                                         | Yes      |
 | grim + slurp                                | Screenshot region selection (`Super+,`) and full screen (`Super+Shift+,`)  | Yes      |
 | wl-clipboard (`wl-copy`)                    | Screenshots are piped to the clipboard                                     | Yes      |
-| wlogout                                     | Power menu (waybar power button)                                           | Yes      |
+| wlogout                                     | Power menu (`Super+Shift+e`)                                               | Yes      |
 | wireplumber (`wpctl`)                       | Volume / mute keys and the waybar audio module                             | Yes      |
 | xdg-desktop-portal-hyprland                 | Screen capture / screen sharing portal backend                             | Yes      |
 | xdg-desktop-portal-gtk                      | File chooser portal for GTK/Flatpak apps (coexists with the hyprland one)  | Yes      |
 | hyprpolkitagent                             | Polkit authentication agent for GUI privilege prompts                      | Yes      |
-| mako (or dunst)                             | Notification daemon (backend for waybar notification modules)              | Yes      |
+| mako (or dunst)                             | Notification daemon (autostarted; the check accepts mako or dunst)         | Yes      |
 | fcitx5                                      | Input method framework (auto-started; GTK/Qt/X11 apps use it via env vars) | Yes      |
 | hyprpaper                                   | Wallpaper daemon (auto-started; reads the bundled `hyprpaper.conf`)        | Yes      |
-| hypridle                                    | Idle daemon (auto lock/suspend via the bundled `hypridle.conf`)            | Yes      |
+| hypridle                                    | Idle daemon (hyprlock at 5 min idle, DPMS off at 5.5 min; no suspend)      | Yes      |
 
 #### Recommended tools
 
@@ -61,7 +67,9 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | hyprlock             | Screen locker (`Super + Escape`)                                                        | Recommended |
 | brightnessctl        | Brightness keys (laptops only, auto-detected)                                           | Recommended |
 | pavucontrol          | Audio mixer (waybar pulseaudio click)                                                   | Recommended |
-| nm-connection-editor | Network settings (waybar network click)                                                 | Recommended |
+| nm-connection-editor | Network settings (opened from the nm-applet tray menu)                                  | Recommended |
+| hyprpicker           | Color picker (freezes the screen, copies the picked pixel)                              | Recommended |
+| hyprsunset           | Color temperature (blue-light filter)                                                   | Recommended |
 | hyprland-guiutils    | Native GUI dialogs (hyprland-dialog/run/welcome; silences the Hyprland startup warning) | Recommended |
 | gnome-calendar       | Calendar (waybar clock right-click)                                                     | Optional    |
 
@@ -75,19 +83,20 @@ sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wirepl
 # hyprlock: https://github.com/hyprwm/hyprlock (not in older apt repos)
 # hyprpolkitagent: not in all apt repos — build from source if absent (see Requirements)
 
-# OpenSUSE
+# OpenSUSE — Tumbleweed ships all of these (hypr* included) in the standard OSS repo
 sudo zypper install hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
     NetworkManager-applet brightnessctl pavucontrol NetworkManager-connection-editor gnome-calendar \
     xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle \
-    NetworkManager-connection-editor fcitx5 fcitx5-chinese-addons fcitx5-configtool
-# hyprlock / hyprpicker / hyprsunset are NOT in the base openSUSE repos — enable
-# the community Wayland repo first so `checkhealth --install` can resolve them:
+    fcitx5 fcitx5-chinese-addons fcitx5-configtool
+sudo zypper install hyprlock hyprpicker hyprsunset
+# On an openSUSE flavor whose repos do not carry a hypr* package yet, the X11:Wayland
+# community repo is where they land first:
 #   sudo zypper addrepo -cfp 90 https://download.opensuse.org/repositories/X11:/Wayland/Tumbleweed/ X11:Wayland
 #   sudo zypper --gpg-auto-import-keys refresh
-sudo zypper install hyprlock hyprpicker hyprsunset 2>/dev/null || echo "still not present — add X11:Wayland repo (path above) or build from source (https://github.com/hyprwm/hyprlock)"
 
-# Arch Linux
-sudo pacman -S hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
+# Arch Linux — wlogout left [extra] and is AUR-only, so pacman -S does not know it;
+# install.sh's aur lane builds it with paru (or use your own helper). The rest:
+sudo pacman -S hyprland waybar wezterm wofi grim slurp wl-clipboard wireplumber \
     network-manager-applet hyprlock brightnessctl pavucontrol nm-connection-editor gnome-calendar \
     xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent mako hyprpaper hypridle \
     fcitx5 fcitx5-chinese-addons fcitx5-configtool
@@ -103,7 +112,7 @@ sudo dnf install waybar grim slurp wl-clipboard wireplumber brightnessctl pavuco
 
 #### Fonts (optional)
 
-waybar uses Nerd Font glyphs (workspaces, network, battery, power icons). Install a [Nerd Font](https://github.com/ryanoasis/nerd-fonts) monospace font and select it in `waybar/style.css`.
+waybar's font family is a Nerd Font (`JetBrains Mono`, `Nerd Font`, `Symbols Nerd Font` in `waybar/style.css`), so install a [Nerd Font](https://github.com/ryanoasis/nerd-fonts) monospace font for icons. The bundled `format-icons` in `waybar/config.jsonc` are empty strings, so the bar renders text (workspace names, volume and capacity percentages) rather than glyphs.
 
 ### 2. Health check
 
@@ -119,6 +128,12 @@ Pass `--install` to automatically install missing dependencies. Supports apt/zyp
 ./checkhealth.sh --install
 ```
 
+`-h`/`--help` prints the usage; `--skip-check-config` skips the config checks (that is what `install.sh` passes, since it links the configs after this step). Exit status is 1 when any required dependency is missing, 0 otherwise.
+
+Sections, in order: Platform; the Hyprland version gate and Required tools (the version probe prints just before the required list); Recommended; Advisory — Nerd Font plus the three hypr-rdp items (binary, `rdp/config.toml.in`, credentials file); and finally Config files, which checks the `~/.config/hypr` and `~/.config/waybar` symlinks and the wlogout config dir. hypr-rdp stays advisory on purpose: no repository carries it and `checkhealth.sh` never installs it, `install.sh` builds it from source.
+
+`SUDO_DROPIN=1` with `--install` keeps a NOPASSWD sudo drop-in for the whole run; the default is a single sudo authentication riding the timestamp (a run chained from `install.sh` uses the drop-in).
+
 ### 3. Install monkey-hyprland
 
 One-liner (installs deps, clones this repo and links the configs):
@@ -129,10 +144,12 @@ curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/inst
 
 > The one-liner needs `git` besides `curl` itself: the installer clones this repository into `~/Documents/monkey-hyprland` before it can install anything. If `git` is missing, the script stops with an error — install it with your system's package manager and re-run the same command.
 
-The installer also writes a **guarded autostart block** to your shell profile files (`~/.zprofile` for zsh; `~/.bash_profile` or `~/.profile` plus `~/.bashrc` for bash — the same profile files an `exec tmux` auto-start block occupies):
+Two variables move the installer's targets: `INSTALL_DIR` (default `~/Documents/monkey-hyprland`) is where this repo is cloned and linked from; `HYPR_RDP_SRC_DIR` (default `~/Documents/hypr-rdp`) is the hypr-rdp source checkout the build runs in.
+
+The installer also writes a **guarded autostart block** to your shell profile files (the target login shell decides the set: `~/.zprofile` for zsh; `~/.bash_profile` — or `~/.profile` when that file is absent — plus `~/.bashrc` for bash; `~/.profile` for anything else — the same profile files an `exec tmux` auto-start block occupies):
 
 ```bash
-# monkey-hyprland autostart (remove these lines to disable)
+# [tail] monkey-hyprland autostart (remove these lines to disable)
 # Keep this block ABOVE any "exec tmux" auto-start block: on a bare TTY
 # exec replaces the login shell with the compositor, so the tmux
 # auto-start line is never reached and the desktop never runs inside a
@@ -140,7 +157,19 @@ The installer also writes a **guarded autostart block** to your shell profile fi
 # the tmux auto-start runs normally.
 if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
     case "$(tty 2>/dev/null)" in
-    /dev/tty[0-9]*) pgrep -x Hyprland >/dev/null 2>&1 || exec start-hyprland ;;
+    /dev/tty[0-9]*)
+        if pgrep -x Hyprland >/dev/null 2>&1; then
+            : # single instance: the compositor already owns a session
+        elif [ "${TERM:-}" = kmscon ]; then
+            if command -v kmscon-launch-gui >/dev/null 2>&1; then
+                exec kmscon-launch-gui start-hyprland
+            else
+                echo "kmscon session: kmscon-launch-gui not found — start start-hyprland manually." >&2
+            fi
+        else
+            exec start-hyprland
+        fi
+        ;;
     esac
 fi
 ```
@@ -160,7 +189,7 @@ ln -sfn $(pwd)/wlogout ~/.config/wlogout
 
 The whole repo is linked as `~/.config/hypr` (so every `hypr*.conf`, `hyprland.lua` and `pictures/` is picked up automatically); waybar and wlogout live at their own `~/.config/` locations and are linked separately.
 
-Then start (or restart) Hyprland. waybar, nm-applet and fcitx5 are launched automatically on startup.
+Then start (or restart) Hyprland. Its `hyprland.start` handler launches waybar, mako, hyprpolkitagent, xdg-desktop-portal-hyprland, hypridle, hyprpaper, nm-applet, fcitx5 and — when installed — hypr-rdp, each behind a `pgrep` guard so a reload never stacks a second copy.
 
 ### 4. Start Hyprland
 
@@ -182,7 +211,7 @@ Never run either under `sudo`/`root`. If the session ends (Super+Shift+e), you a
 
 If another desktop environment is already installed (started by GDM, SDDM, etc.), there are two ways to get into Hyprland:
 
-**Via the display manager** — log out to the login screen and pick Hyprland from the session menu. Hyprland ships its own desktop entry in `/usr/share/wayland-sessions/`; if it is missing, create it:
+**Via the display manager** — log out to the login screen and pick Hyprland from the session menu. Hyprland ships its own desktop entry in `/usr/share/wayland-sessions/` (current builds set `Exec=/usr/bin/start-hyprland` so the session gets the watchdog); if it is missing, create it:
 
 ```ini
 # /usr/share/wayland-sessions/hyprland.desktop
@@ -217,7 +246,7 @@ No need to stop the display manager: logind hands the seat (DRM master + input d
 Add the following to the profile (`~/.zprofile` for zsh, `~/.bash_profile`/`~/.profile` + `~/.bashrc` for bash):
 
 ```bash
-# monkey-hyprland autostart (remove these lines to disable)
+# [tail] monkey-hyprland autostart (remove these lines to disable)
 # Keep this block ABOVE any "exec tmux" auto-start block: on a bare TTY
 # exec replaces the login shell with the compositor, so the tmux
 # auto-start line is never reached and the desktop never runs inside a
@@ -225,7 +254,19 @@ Add the following to the profile (`~/.zprofile` for zsh, `~/.bash_profile`/`~/.p
 # the tmux auto-start runs normally.
 if [ -z "${WAYLAND_DISPLAY:-}" ] && [ -z "${DISPLAY:-}" ]; then
     case "$(tty 2>/dev/null)" in
-    /dev/tty[0-9]*) pgrep -x Hyprland >/dev/null 2>&1 || exec start-hyprland ;;
+    /dev/tty[0-9]*)
+        if pgrep -x Hyprland >/dev/null 2>&1; then
+            : # single instance: the compositor already owns a session
+        elif [ "${TERM:-}" = kmscon ]; then
+            if command -v kmscon-launch-gui >/dev/null 2>&1; then
+                exec kmscon-launch-gui start-hyprland
+            else
+                echo "kmscon session: kmscon-launch-gui not found — start start-hyprland manually." >&2
+            fi
+        else
+            exec start-hyprland
+        fi
+        ;;
     esac
 fi
 ```
@@ -296,6 +337,38 @@ curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/inst
 
 > Pass `tty1` only when no display manager owns it — a DM on its login VT and kmscon on the same VT will fight over the seat.
 
+### Remote desktop (hypr-rdp)
+
+`install.sh` builds [hypr-rdp](https://github.com/MuNeNICK/hypr-rdp) from
+source and installs it to `/usr/local/bin` when no `hypr-rdp` is on PATH yet:
+the distro build-dependency set, `rustup` through the shared `ensure_rust`, then
+`cargo build --release --locked`. Every stage is non-fatal — a desktop that came
+up without hypr-rdp is still a desktop, and each skip prints its own warning.
+
+- **Credentials**: `~/.config/hypr-rdp/credentials` (dir `700`, file `600`),
+  generated with `openssl rand -base64 24` when the file is absent. The value is
+  never printed — the file is the only place it lands. Without `openssl` the
+  installer says so and hands you the one command to create it yourself; until
+  that file exists the RDP server does not start.
+- **Config**: the `hyprland.lua` autostart block renders
+  `~/.config/hypr-rdp/config.toml` from `rdp/config.toml.in` on every Hyprland
+  start, substituting the capture monitor (`@@OUTPUT@@`), `$USER` and the
+  credentials path. Edit the **template**, not the rendered file — the render
+  overwrites it, and it skips an unknown `@@PLACEHOLDER@@` verbatim so a typo
+  stays visible. Re-run by reloading Hyprland or logging back in.
+- **Probe**: the monitor lookup shells out to `hyprctl monitors -j` and `jq`.
+  Without `jq` the capture monitor never resolves, the render logs `hypr-rdp: no
+enabled monitor found, not starting` and the server stays off — `checkhealth.sh`
+  does not probe `jq`, so install it alongside the compositor packages.
+- **What gets captured**: the focused enabled monitor (lowest id as the
+  fallback), skipping disabled panels and hypr-rdp's own headless outputs — a
+  stale one can outlive a crash. No resolution is set on purpose: hypr-rdp reads
+  the source size from the output, and leaving resolution out keeps the client
+  in control of the session size.
+- **Startup**: `pgrep -x hypr-rdp || hypr-rdp &`, so a reload never stacks a
+  second server. It listens on `0.0.0.0:3389` at 30 fps — a plain RDP client on
+  the LAN connects with `$USER` and the credentials file as the password.
+
 ### 5. Update project
 
 ```bash
@@ -324,12 +397,10 @@ clones _this_ repo straight into the install directory (`~/Documents/monkey-hypr
 and runs the `install.sh` from that clone, so the installer and the `scripts/`
 it loads always come from the same revision. If that directory already exists
 but is not a git clone, the installer refuses to touch it and tells you so.
-Once the subtree above is committed and
-pushed, a regular `git clone` of this repo already contains `scripts/` —
-there is nothing extra to clone or pull; updates arrive through a plain
-`git pull`. Only a checkout from before that commit lacks `scripts/`:
-`git pull` (or re-running `install.sh`, which pulls that checkout in place)
-fixes it.
+The subtree is committed, so a regular `git clone` of this repo already contains `scripts/` — there is
+nothing extra to clone or pull; updates arrive through a plain `git pull`. Only a checkout from before
+the subtree commit lacks `scripts/`: `git pull` (or re-running `install.sh`, which pulls that checkout
+in place) fixes it.
 
 ## Keybindings
 
@@ -386,6 +457,7 @@ Super+Shift+]         Move window to next monitor
 ```text
 Super+Return          Terminal (wezterm)
 Super+d               Application launcher (wofi drun)
+Super+r               Run dialog (wofi --show run)
 Super+Escape          Lock screen (hyprlock, if installed)
 Super+Shift+e         Power menu (wlogout: lock/exit/logout/reboot/shutdown/hibernate — keys l/e/o/r/s/h, shown on the buttons, Esc cancels)
 ```
@@ -413,9 +485,11 @@ Super+Shift+,    Screenshot the full screen, copy to clipboard
 - Maximize events are suppressed for all windows (avoids layout bugs)
 - XWayland windows with empty class/title are not focused (fixes drag issues)
 - Small utility apps (calculator, pavucontrol, settings dialogs, etc.) open floating and centered — see the `float_tools` list in `hyprland.lua`
-- Firefox/Chrome `Picture-in-Picture` windows float, pin and stay on top
+- Firefox/Chrome `Picture-in-Picture` windows float and pin
 - Terminals (Alacritty/kitty/wezterm/foot/ghostty) get `0.95` inactive opacity
 - waybar gets blur via a layer rule
+- `zenity` dialogs drop Hyprland's decorations (they draw their own frame)
+- File-operation progress dialogs float and center by title
 
 ## Laptop extras
 
@@ -432,13 +506,14 @@ The bundled `waybar/` directory contains a matching config and style:
 
 ```text
 modules-left:    hyprland/workspaces  (click to activate, scroll to switch)
-modules-center:  clock                (click for full date, right-click gnome-calendar)
-modules-right:   tray, network, pulseaudio, battery, custom/power
+modules-center:  clock                (right-click gnome-calendar)
+modules-right:   tray, pulseaudio, battery
 ```
 
-- There is no `custom/power` module in the bundled config — the power menu is `wlogout` on `Super+Shift+e` (bundled `wlogout/` layout + style; buttons bound to l/e/r/s, Esc cancels)
+- There is no `custom/power` or `network` module in the bundled config — the power menu is `wlogout` on `Super+Shift+e` (bundled `wlogout/` layout + style; buttons bound to l/e/o/r/s/h, Esc cancels)
 - Battery has warning (30%) / critical (15%) states; hidden on desktops without a battery
 - The style uses the same sonokai palette as `hyprland.lua`
+- `style.css` still carries `#custom-power` and `#custom-separator` rules from removed modules; nothing in `config.jsonc` renders them
 
 ## Precautions
 
@@ -446,6 +521,6 @@ modules-right:   tray, network, pulseaudio, battery, custom/power
 - **Terminal is wezterm** — change the `terminal` variable at the top of `hyprland.lua` to switch (any of `Alacritty|kitty|wezterm|foot|ghostty` also picks up the opacity window rule).
 - **Scale is fixed at `1.0` by default** — `scale = "auto"` can over-amplify on displays that report a wrong/small physical size (VM, VNC/RDP, headless). Tune the `scale` variable at the top of `hyprland.lua` and reload (`hyprctl reload`).
 - **Animations are disabled** by design for performance; enable them in the `animations` section if you prefer.
-- **Lid switch may not fire under Lua** — `switch:on:Lid Switch` has a known regression in Lua configs (hyprwm/Hyprland#14858). If you rely on lid-close locking, prefer a udev rule running `loginctl lock-session` on `LID_STATE=closed` over the bind.
+- **No lid bind ships here** — the config registers no `switch:on:Lid Switch`, so closing the lid locks only through hypridle's timer or logind's own lid policy. `switch:on:Lid Switch` is reported to regress in Lua configs (hyprwm/Hyprland#14858, not verified here); if you rely on lid-close locking, prefer a udev rule running `loginctl lock-session` on `LID_STATE=closed` over the bind.
 - **No `hl.config({ autogenerated = true })`** — this config is hand-written and omits the shipped-example flag, so no persistent yellow warning bar appears.
-- **Environment is pre-set for Wayland** — `hyprland.lua` exports `XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `XDG_SESSION_DESKTOP`, `QT_QPA_PLATFORM=wayland;xcb`, `QT_WAYLAND_DISABLE_WINDOWDECORATION` and an Electron ozone hint, keeping Qt/GTK/Electron apps off blurry XWayland and portals behaving correctly. Input method env vars `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, `XMODIFIERS=@im=fcitx` are exported too, so GTK/Qt/X11 apps route typing through fcitx5.
+- **Environment is pre-set for Wayland** — `hyprland.lua` exports `XDG_CURRENT_DESKTOP`, `XDG_SESSION_TYPE`, `XDG_SESSION_DESKTOP`, `QT_QPA_PLATFORM=wayland;xcb`, `QT_WAYLAND_DISABLE_WINDOWDECORATION` and an Electron ozone hint, keeping Qt/GTK/Electron apps off blurry XWayland and portals behaving correctly. Input method env vars `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`, `XMODIFIERS=@im=fcitx` are exported too, so GTK/Qt/X11 apps route typing through fcitx5. It also sets `XCURSOR_SIZE`/`HYPRCURSOR_SIZE` to `18`, `QT_QPA_PLATFORMTHEME=qt6ct`, `GDK_BACKEND=wayland,x11`, `GDK_DPI_SCALE=1` and `NIXOS_OZONE_WL=1`.
