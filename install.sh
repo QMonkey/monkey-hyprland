@@ -22,7 +22,7 @@ set -euo pipefail
 
 # ──────────────────────── repository identity ────────────────────────
 # Declared before the framework is sourced: the bootstrap below needs both
-# values, and clones into the very directory clone_monkey_project would
+# values, and clones into the very directory clone_project would
 # have used — one clone per run, not two.
 PROJECT=monkey-hyprland
 PROJECT_REPO=https://github.com/QMonkey/monkey-hyprland.git
@@ -41,15 +41,15 @@ if [ ! -f "$_monkey_scripts/install.sh" ]; then
 		# Outdated checkout: update it in place and keep running from it.
 		git -C "$_monkey_dir" pull --ff-only || true
 		if [ ! -f "$_monkey_dir/scripts/install.sh" ]; then
-			echo "monkey-scripts missing from $_monkey_dir (no scripts/ subtree)." >&2
-			echo "  git -C $_monkey_dir pull    # outdated checkout — or the repo never added the subtree" >&2
+			printf '%s\n' "monkey-scripts missing from $_monkey_dir (no scripts/ subtree)." >&2
+			printf '%s\n' "  git -C $_monkey_dir pull    # outdated checkout — or the repo never added the subtree" >&2
 			exit 1
 		fi
 		_monkey_scripts="$_monkey_dir/scripts"
 	else
 		# curl|bash or a .git-less directory: the only path to a
 		# same-revision scripts/ is the INSTALL_DIR checkout.
-		# clone_monkey_project cannot do this job — it lives in the very
+		# clone_project cannot do this job — it lives in the very
 		# scripts/ being fetched. INSTALL_DIR is where the framework's clone
 		# step would have put the checkout too, so that step only confirms it.
 		if [ -d "$INSTALL_DIR/.git" ]; then
@@ -57,15 +57,15 @@ if [ ! -f "$_monkey_scripts/install.sh" ]; then
 			git -C "$INSTALL_DIR" pull --ff-only || true
 		elif [ -d "$INSTALL_DIR" ] && [ -n "$(ls -A "$INSTALL_DIR")" ]; then
 			# git clone would refuse too, so say why in our own words.
-			echo "$INSTALL_DIR is not empty and is not a git clone." >&2
-			echo "  move it aside, delete it, or set INSTALL_DIR elsewhere." >&2
+			printf '%s\n' "$INSTALL_DIR is not empty and is not a git clone." >&2
+			printf '%s\n' "  move it aside, delete it, or set INSTALL_DIR elsewhere." >&2
 			exit 1
 		else
 			# Fresh clone — the ONLY sub-branch where git is hard-required:
 			# the pull sub-branch above degrades gracefully without it, and
 			# a zip/tarball must not fail here just for a missing git.
 			if ! command -v git >/dev/null 2>&1; then
-				echo "git is required to clone $PROJECT — install it first (e.g. sudo apt-get install git), then re-run." >&2
+				printf '%s\n' "git is required to clone $PROJECT — install it first (e.g. sudo apt-get install git), then re-run." >&2
 				exit 1
 			fi
 			# No retry() available yet — the framework loads only after this
@@ -96,14 +96,14 @@ fi
 . "$_monkey_scripts/install.sh"
 
 # hypr-rdp is built from source in this process and needs a Rust toolchain;
-# ensure_rust lives in lib/toolchain.sh, which scripts/install.sh sources itself.
+# ensure_rust lives in lib/toolchain.sh, which lib/bootstrap.sh sources.
 
 # ──────────────────────── layout & data ────────────────────────
 LINUX_ONLY=1
-FINISH_INJECT=0 # the original writes no TIOCSTI hint — just the summary
+FINISH_INJECT=0 # no TIOCSTI hint for this project — the summary alone
 # hypr-rdp has no package in any repo, so it is built from a source checkout
-# kept outside this repo (a git clone inside a git clone would need a
-# .gitignore entry and pull in ~200MB of target/).
+# kept outside this repo: a git clone inside a git clone would need a
+# .gitignore entry and would drag cargo's target/ tree in with it.
 HYPR_RDP_SRC_DIR="${HYPR_RDP_SRC_DIR:-$HOME/Documents/hypr-rdp}"
 # Set by install_step_post_tool once hypr-rdp is on PATH; gates its summary
 # lines ("?VAR|" entries in finish_install).
@@ -113,9 +113,9 @@ SUMMARY_LINES=(
 	"  Start Hyprland from a TTY (never under sudo/root): ${CYAN}start-hyprland${NC} (or ${CYAN}Hyprland${NC} on older builds)"
 	"  Update: ${CYAN}cd $INSTALL_DIR && git pull && hyprctl reload${NC}"
 )
-# hyprland's links are reported with the full destination path and never
-# re-created under an existing entry — that is the shared link_config's own
-# behaviour (lib/config.sh), so the links are plain SYMLINKS data.
+# Plain SYMLINKS data: link_config's default mode (lib/config.sh) warns and
+# skips when the destination already exists as something else, and never
+# re-points an existing entry.
 SYMLINKS=(
 	"$INSTALL_DIR|$HOME/.config/hypr"
 	"$INSTALL_DIR/waybar|$HOME/.config/waybar"
@@ -162,9 +162,7 @@ install_hyprland() {
 }
 
 # ──────────────────────── hypr-rdp (from source) ────────────────────────
-# No supported repo carries hypr-rdp: upstream offers AUR, Nix and a GitHub
-# release only, and that release predates the PAM-auth commit — a prebuilt
-# binary would silently lose --auth-mode. Build from source instead.
+# No supported repo carries hypr-rdp, so it is built from source here.
 #
 # Runs on install_step_post_tool: it is a tool install, so it belongs next to
 # the tool step, and checkhealth below then reports the result.
@@ -245,7 +243,7 @@ setup_rdp_credentials() {
 		# password exists — killing the whole component over it cost
 		# monkey-hyprland on CentOS/Fedora (no openssl CLI there).
 		warn "openssl not found — hypr-rdp stays disabled until you create the RDP password yourself:"
-		warn "  mkdir -p $dir && chmod 700 $dir && echo your-password >$file && chmod 600 $file"
+		warn "  mkdir -p $dir && chmod 700 $dir && printf '%s\n' your-password >$file && chmod 600 $file"
 		return 0
 	fi
 	mkdir -p "$dir"
@@ -260,10 +258,10 @@ setup_rdp_credentials() {
 	ok "Generated an RDP password in $file"
 	# Never print the value: a one-shot installer runs on shared/CI logs, and
 	# the file is the only place it should ever land.
-	# Four backslashes: two for the shell string, two for echo -e's own
-	# escape pass — otherwise the hint prints a real newline mid-command.
-	echo -e "    Read it with: ${CYAN}cat $file${NC}"
-	echo -e "    Rotate it with: ${CYAN}printf '%s\\\\n' 'new-password' >$file${NC}"
+	# Four backslashes: two for the shell string, two for %b's own escape
+	# pass — otherwise the hint prints a real newline mid-command.
+	printf '%s\n' "    Read it with: ${CYAN}cat $file${NC}"
+	printf '%b\n' "    Rotate it with: ${CYAN}printf '%s\\\\n' 'new-password' >$file${NC}"
 }
 
 # Never fatal: a desktop that came up without hypr-rdp is still a desktop.
@@ -274,14 +272,8 @@ install_hypr_rdp() {
 		HYPR_RDP_INSTALLED=1
 		return 0
 	fi
-	case "$OS" in
-	debian | ubuntu | arch | opensuse | centos | fedora) ;;
-	*)
-		warn "No known hypr-rdp build dependencies for $OS — skipping."
-		warn "  https://github.com/MuNeNICK/hypr-rdp#build-from-source"
-		return 0
-		;;
-	esac
+	# No OS guard here: LINUX_ONLY=1 means install_main already left on
+	# macOS, and os_init left only the six distro ids hypr_rdp_deps covers.
 	if ! hypr_rdp_deps; then
 		warn "could not install hypr-rdp build dependencies — skipping the build."
 		return 0
@@ -308,20 +300,20 @@ install_hypr_rdp() {
 }
 
 # ──────────────────────── hooks ────────────────────────
-# A hook prints its own trailing blank line when it produced output; the
-# upstream separates setup_sudo from the first step with its own blank.
+# install_main prints no blank after setup_sudo (scripts/install.sh), so a
+# project that wants separation opens its own prepare hook with one.
 install_step_prepare() {
-	echo ""
+	printf '\n'
 	install_hyprland
-	echo ""
+	printf '\n'
 }
 
-# hypr-rdp after the tool step. Its summary lines go before the trailing
-# "Update:" entry rather than at the end, so the update hint stays last: split
+# hypr-rdp's summary lines go before the trailing "Update:" entry rather
+# than at the end, so the update hint stays last: summary_insert_at splits
 # the array instead of hardcoding indices, which the base list's length owns.
 install_step_post_tool() {
 	install_hypr_rdp
-	echo ""
+	printf '\n'
 	summary_insert_at -1 \
 		"?HYPR_RDP_INSTALLED|  RDP: ${CYAN}hypr-rdp${NC} autostarts with Hyprland and mirrors the focused monitor" \
 		"?HYPR_RDP_INSTALLED|  Edit ${CYAN}$INSTALL_DIR/rdp/config.toml.in${NC} and log back in to re-render it" \
@@ -336,10 +328,10 @@ install_step_autostart() {
 	local launcher=Hyprland
 	command -v start-hyprland >/dev/null 2>&1 && launcher=start-hyprland
 	# pgrep matches the compositor process name, not the launcher: the
-	# start-hyprland watchdog execs into Hyprland either way.
+	# start-hyprland watchdog spawns Hyprland as its child either way.
 	run_kmscon_setup
 	write_tty_autostart "$launcher" Hyprland
-	echo ""
+	printf '\n'
 	if [ -n "$AUTOSTART_FILES" ]; then
 		summary_insert_at 2 "  Autostart: a VT login execs ${CYAN}${launcher}${NC} unless Hyprland is already running (block in:${CYAN}${AUTOSTART_FILES}${NC})"
 	fi
@@ -353,7 +345,5 @@ install_step_autostart() {
 # (install.sh entry point): it fills KMSCON_TTYS/KMSCON_DONE and _INSTALL_ARGS — the
 # flag never reaches install_main.
 
-# The flag stays local: the parser fills _INSTALL_ARGS in this shell and
-# install_main never sees it.
 parse_install_args "$@"
 install_main "${_INSTALL_ARGS[@]+"${_INSTALL_ARGS[@]}"}"
