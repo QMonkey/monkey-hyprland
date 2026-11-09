@@ -9,8 +9,8 @@ set -euo pipefail
 # ──────────────────────────────────────────────────────────────
 
 . "$(dirname "${BASH_SOURCE[0]:-$0}")/scripts/checkhealth.sh" || {
-	echo "monkey-scripts not found — update this checkout (git pull / re-clone)," >&2
-	echo "or run install.sh, which bootstraps monkey-scripts itself." >&2
+	printf '%s\n' "monkey-scripts not found — update this checkout (git pull / re-clone)," >&2
+	printf '%s\n' "or run install.sh, which bootstraps monkey-scripts itself." >&2
 	exit 1
 }
 
@@ -53,9 +53,9 @@ REQUIRED_CHECKS=(
 # The post-install re-probe walks the specs themselves (one "installed" /
 # "still missing" line each, anyof/anyofext semantics included) instead of
 # re-printing the whole section — REQUIRED_REPROBE_LIST with spec entries +
-# REQUIRED_MANUAL_HINT reproduce that via the shared install_missing_required
-# (monkey-scripts/lib/checks.sh). Package-name mapping lives in the shared
-# lib/pkg.sh table.
+# REQUIRED_MANUAL_HINT reproduce that via install_missing_required
+# (lib/missing.sh). Package names resolve through the pkg_name door
+# (lib/pkg.sh) into the distro tables (lib/distro.sh).
 REQUIRED_REPROBE_LIST=("${REQUIRED_CHECKS[@]}")
 REQUIRED_MANUAL_HINT="Not in system repos — install manually: wezterm (https://wezterm.org/installation), hyprlock (https://github.com/hyprwm/hyprlock), xdg-desktop-portal-hyprland, hyprpolkitagent, hyprpaper, hypridle (on Arch all of these are in the official repo)"
 
@@ -75,7 +75,7 @@ RECOMMENDED_CHECKS=(
 # ──────────────────────── advisory ────────────────────────
 # hypr-rdp is reported here, never installed by this script: no repo carries
 # it, and the installer builds it from source (install_step_post_tool). An
-# RECOMMENDED_CHECKS entry would need install=none — and checks.sh prints a
+# RECOMMENDED_CHECKS entry would need install=none — and missing.sh prints a
 # red "✗ failed to install" for those — so an advisory section is the honest
 # fit. The credentials file matters as much as the binary: hyprland.lua's RDP
 # section refuses to start the server without it.
@@ -98,7 +98,7 @@ CONFIG_LINKS=(
 )
 # type|params|ok|incomplete|missing
 CONFIG_HINTS=(
-	"any|$HOME/.config/wlogout wlogout|wlogout present (power menu)||wlogout config dir not found (waybar power button needs it)"
+	"any|$HOME/.config/wlogout wlogout|wlogout present (power menu)||wlogout config dir not found (Super+Shift+e power menu — run: ln -sfn $REPO_DIR/wlogout ~/.config/wlogout)"
 )
 
 checkhealth_main "$@"
