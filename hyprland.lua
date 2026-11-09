@@ -90,7 +90,6 @@ hl.env("NIXOS_OZONE_WL", "1")
 
 -- -----------------------------------------------------------------------------
 -- MONITORS
--- Auto-detect every monitor at its highest refresh rate,
 -- secondary monitors use their own workspaces (extended desktop).
 -- -----------------------------------------------------------------------------
 hl.monitor({
@@ -125,8 +124,6 @@ end
 -- itself, and leaving resolution out of the config is what keeps the client
 -- in control of the session size.
 local function detect_capture_monitor()
-  -- The jq program uses single-quoted jq strings, so the shell double quotes
-  -- below only need embedded " escaped; it must not grow $ or backticks.
   local filter = [[
     [ .[]
       | select(.disabled | not)
