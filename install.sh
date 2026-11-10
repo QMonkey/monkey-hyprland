@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ──────────────────────────────────────────────────────────────
 # monkey-hyprland one-shot installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/QMonkey/monkey-hyprland/master/install.sh | bash 2>&1 | tee monkey-hyprland-install.log
 #
 # Installs Hyprland from the distro repo when its version supports the Lua
 # config API (>= 0.55), installs the remaining dependencies via
@@ -109,16 +109,19 @@ HYPR_RDP_SRC_DIR="${HYPR_RDP_SRC_DIR:-$HOME/Documents/hypr-rdp}"
 # lines ("?VAR|" entries in finish_install).
 HYPR_RDP_INSTALLED=""
 SUMMARY_LINES=(
-	"  Config: ${CYAN}$INSTALL_DIR${NC} → ${CYAN}~/.config/hypr + ~/.config/waybar${NC}"
+	"  Config: ${CYAN}$INSTALL_DIR${NC} → ${CYAN}~/.config/hypr (waybar/ + wlogout/ live under it)${NC}"
 	"  Start Hyprland from a TTY (never under sudo/root): ${CYAN}start-hyprland${NC} (or ${CYAN}Hyprland${NC} on older builds)"
 	"  Update: ${CYAN}cd $INSTALL_DIR && git pull && hyprctl reload${NC}"
 )
 # Plain SYMLINKS data: link_config's default mode (lib/config.sh) warns and
 # skips when the destination already exists as something else, and never
 # re-points an existing entry.
+# waybar is NOT linked to ~/.config/waybar: that default is compositor-neutral,
+# so whichever desktop config was installed last would end up owning it. The
+# repo-level link above already exposes the bar as ~/.config/hypr/waybar, the
+# path hyprland.lua passes to `waybar -c`.
 SYMLINKS=(
 	"$INSTALL_DIR|$HOME/.config/hypr"
-	"$INSTALL_DIR/waybar|$HOME/.config/waybar"
 	"$INSTALL_DIR/wlogout|$HOME/.config/wlogout"
 )
 
@@ -173,7 +176,7 @@ install_hyprland() {
 # clang is not optional: pam-sys generates its bindings with bindgen, which
 # links libclang (on openSUSE the clang package pulls in libclang13).
 hypr_rdp_deps() {
-	local deps
+	local deps rc=0
 	case "$OS" in
 	debian | ubuntu)
 		# pkg-config: NOT part of build-essential — libspa-sys and friends
@@ -206,7 +209,15 @@ hypr_rdp_deps() {
 		;;
 	*) return 1 ;;
 	esac
-	install_pkg "${deps[@]}"
+	# The "pkg" LANE, not install_pkg's chain: these are the headers IronRDP
+	# links against, and a pipewire/clang from a bottle or an AUR build would
+	# compile a session-capture binary against an ABI the host's Wayland
+	# session does not actually run. The lane's status is what the caller acts
+	# on (skip the build), but the unmapped names are reported first — an
+	# all-unknown batch returns before anything is printed.
+	pkg_install pkg "${deps[@]}" || rc=$?
+	warn_unknown_pkgs
+	return "$rc"
 }
 
 # hypr-rdp builds IronRDP from git and needs a current stable Rust, which
