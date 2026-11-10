@@ -207,8 +207,10 @@ end
 -- flag is set, so no yellow warning bar is shown.
 -- -----------------------------------------------------------------------------
 hl.on("hyprland.start", function()
-  -- Status bar (login-start, keep it running)
-  hl.exec_cmd("pgrep -x waybar || waybar &")
+  -- Status bar (login-start, keep it running). The config dir is named
+  -- explicitly: the ~/.config/waybar default is compositor-neutral, so taking
+  -- it would let bar behaviour depend on which desktop config was installed last.
+  hl.exec_cmd("pgrep -x waybar || waybar -c ~/.config/hypr/waybar &")
   -- Notification daemon (required by waybar notification modules)
   hl.exec_cmd("pgrep -x mako || mako &")
   -- Polkit authentication agent (GUI privilege prompts)
