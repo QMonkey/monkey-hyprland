@@ -130,7 +130,7 @@ Pass `--install` to automatically install missing dependencies. Supports apt/zyp
 
 `-h`/`--help` prints the usage; `--skip-check-config` skips the config checks (that is what `install.sh` passes, since it links the configs after this step). Exit status is 1 when any required dependency is missing, 0 otherwise.
 
-Sections, in order: Platform; the Hyprland version gate and Required tools (the version probe prints just before the required list); Recommended; Advisory — Nerd Font plus the three hypr-rdp items (binary, `rdp/config.toml.in`, credentials file); and finally Config files, which checks the `~/.config/hypr` and `~/.config/waybar` symlinks and the wlogout config dir. hypr-rdp stays advisory on purpose: no repository carries it and `checkhealth.sh` never installs it, `install.sh` builds it from source.
+Sections, in order: Platform; the Hyprland version gate and Required tools (the version probe prints just before the required list); Recommended; Advisory — Nerd Font plus the three hypr-rdp items (binary, `rdp/config.toml.in`, credentials file); and finally Config files, which checks the `~/.config/hypr` symlink (it carries `waybar/` too) and the wlogout config dir. hypr-rdp stays advisory on purpose: no repository carries it and `checkhealth.sh` never installs it, `install.sh` builds it from source.
 
 `SUDO_DROPIN=1` with `--install` keeps a NOPASSWD sudo drop-in for the whole run; the default is a single sudo authentication riding the timestamp (a run chained from `install.sh` uses the drop-in).
 
@@ -183,11 +183,10 @@ git clone https://github.com/QMonkey/monkey-hyprland.git
 cd monkey-hyprland
 mkdir -p ~/.config
 ln -sfn $(pwd) ~/.config/hypr
-ln -sfn $(pwd)/waybar ~/.config/waybar
 ln -sfn $(pwd)/wlogout ~/.config/wlogout
 ```
 
-The whole repo is linked as `~/.config/hypr` (so every `hypr*.conf`, `hyprland.lua` and `pictures/` is picked up automatically); waybar and wlogout live at their own `~/.config/` locations and are linked separately.
+The whole repo is linked as `~/.config/hypr` (so every `hypr*.conf`, `hyprland.lua`, `pictures/` and `waybar/` is picked up automatically); only wlogout links separately, because it reads its own `~/.config/wlogout`. waybar is started with `-c ~/.config/hypr/waybar` instead of the compositor-neutral `~/.config/waybar` default — that path is shared by every Wayland desktop config on the machine, so whichever one was installed last would otherwise decide what the bar shows.
 
 Then start (or restart) Hyprland. Its `hyprland.start` handler launches waybar, mako, hyprpolkitagent, xdg-desktop-portal-hyprland, hypridle, hyprpaper, nm-applet, fcitx5 and — when installed — hypr-rdp, each behind a `pgrep` guard so a reload never stacks a second copy.
 
