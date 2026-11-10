@@ -90,11 +90,12 @@ ADVISORY_SECTIONS=(
 
 # ──────────────────────── config ────────────────────────
 # src|dst|desc|mode|name|hint — hypr uses "strict" (the whole repo linked as
-# ~/.config/hypr must resolve into THIS checkout); waybar accepts any symlink.
+# ~/.config/hypr must resolve into THIS checkout). No waybar row: the bar config
+# is a plain directory inside that link (~/.config/hypr/waybar, read by
+# `waybar -c`), not a symlink of its own, so the strict row already covers it.
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONFIG_LINKS=(
 	"$REPO_DIR|$HOME/.config/hypr|~/.config/hypr|strict||~/.config/hypr not found (run: ln -sfn $REPO_DIR ~/.config/hypr)"
-	"$REPO_DIR/waybar|$HOME/.config/waybar|waybar|||waybar config not found (run: ln -sfn $REPO_DIR/waybar ~/.config/waybar)"
 )
 # type|params|ok|incomplete|missing
 CONFIG_HINTS=(
