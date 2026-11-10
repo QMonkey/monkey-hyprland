@@ -26,12 +26,16 @@
       "default": ""
     },
     "on-click": "activate",
-    "on-scroll-up": "hyprctl dispatch hl.dsp.focus({workspace='e+1'})",
-    "on-scroll-down": "hyprctl dispatch hl.dsp.focus({workspace='e-1'})",
+    // on-scroll-* runs through a shell, so these are hyprctl dispatcher calls:
+    // "workspace e+1" is the native dispatcher, while hl.dsp.focus(...) is a
+    // Lua-config function name and no hyprctl dispatcher.
+    "on-scroll-up": "hyprctl dispatch workspace e+1",
+    "on-scroll-down": "hyprctl dispatch workspace e-1",
     "all-outputs": false,
     "sort-by-number": true,
-    "active-only": false,
-    "persist-workspace": true
+    "active-only": false
+    // Persistent workspaces are the "persistent-workspaces" OBJECT (id => name
+    // or "output:N"); the bool this block used to carry was never read.
   },
   "clock": {
     "format": "{:%H:%M  %a %m-%d}",
