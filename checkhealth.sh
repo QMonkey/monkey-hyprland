@@ -30,7 +30,7 @@ MAIN_VERSION_TITLE="Hyprland version"
 # ──────────────────────── required ────────────────────────
 REQUIRED_CHECKS=(
 	"@header|Required tools"
-	"@note|(compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle/input method)"
+	"@note|(compositor/bar/terminal/launcher/screenshot/portals/polkit/notif/audio/wallpaper/idle/input method/CJK font)"
 	"hyprctl|bin|hyprctl (ships with Hyprland)"
 	"waybar|bin|waybar"
 	"wezterm|bin|wezterm (default terminal)"
@@ -47,6 +47,10 @@ REQUIRED_CHECKS=(
 	"xdg-desktop-portal-gtk|anyofext:xdg-desktop-portal-gtk|xdg-desktop-portal-gtk (file-chooser portal)"
 	"hyprpolkitagent|anyofext:hyprpolkitagent|hyprpolkitagent (polkit auth agent)"
 	"notif|anyofext:mako dunst|notification daemon (mako/dunst)"
+	# fc:zh:Noto asks fontconfig for a Noto CJK family by name — not "any Chinese
+	# font": a host typing Chinese through fcitx5 into WenQuanYi still gets Noto, since
+	# the shapes are the point. "cjkfont" is the sentinel in scripts/lib/distro.sh.
+	"cjkfont|fc:zh:Noto|CJK font (Noto CJK)"
 )
 
 # ──────────────────────── required install ────────────────────────
