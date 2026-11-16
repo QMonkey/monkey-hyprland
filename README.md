@@ -56,6 +56,7 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 | hyprpolkitagent                             | Polkit authentication agent for GUI privilege prompts                      | Yes      |
 | mako (or dunst)                             | Notification daemon (autostarted; the check accepts mako or dunst)         | Yes      |
 | fcitx5                                      | Input method framework (auto-started; GTK/Qt/X11 apps use it via env vars) | Yes      |
+| Noto CJK font                               | Chinese glyphs in Noto shapes (not just any CJK font)                      | Yes      |
 | hyprpaper                                   | Wallpaper daemon (auto-started; reads the bundled `hyprpaper.conf`)        | Yes      |
 | hypridle                                    | Idle daemon (hyprlock at 5 min idle, DPMS off at 5.5 min; no suspend)      | Yes      |
 
@@ -77,7 +78,7 @@ The project monkey-hyprland, aims to make a clean, fast and vim-flavored Hyprlan
 # Debian
 sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wireplumber \
     network-manager-gnome brightnessctl pavucontrol nm-connection-editor gnome-calendar \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako fcitx5 fcitx5-chinese-addons \
+    xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako fcitx5 fcitx5-chinese-addons fonts-noto-cjk \
     hyprpaper hypridle
 # wezterm: https://wezterm.org/installation
 # hyprlock: https://github.com/hyprwm/hyprlock (not in older apt repos)
@@ -87,7 +88,7 @@ sudo apt-get install hyprland waybar wofi grim slurp wl-clipboard wlogout wirepl
 sudo zypper install hyprland waybar wezterm wofi grim slurp wl-clipboard wlogout wireplumber \
     NetworkManager-applet brightnessctl pavucontrol NetworkManager-connection-editor gnome-calendar \
     xdg-desktop-portal-hyprland xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle \
-    fcitx5 fcitx5-chinese-addons fcitx5-configtool
+    fcitx5 fcitx5-chinese-addons fcitx5-configtool google-noto-sans-sc-fonts
 sudo zypper install hyprlock hyprpicker hyprsunset
 # On an openSUSE flavor whose repos do not carry a hypr* package yet, the X11:Wayland
 # community repo is where they land first:
@@ -99,13 +100,13 @@ sudo zypper install hyprlock hyprpicker hyprsunset
 sudo pacman -S hyprland waybar wezterm wofi grim slurp wl-clipboard wireplumber \
     network-manager-applet hyprlock brightnessctl pavucontrol nm-connection-editor gnome-calendar \
     xdg-desktop-portal-hyprland xdg-desktop-portal-gtk hyprpolkitagent mako hyprpaper hypridle \
-    fcitx5 fcitx5-chinese-addons fcitx5-configtool
+    fcitx5 fcitx5-chinese-addons fcitx5-configtool noto-fonts-cjk
 # also install fcitx5-qt fcitx5-gtk to make Qt/GTK apps use the input method
 
 # CentOS/RHEL — hyprland is not packaged in any repo; build it from source
 # (see Requirements). The remaining tools:
 sudo dnf install waybar grim slurp wl-clipboard wireplumber brightnessctl pavucontrol \
-    xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle fcitx5 fcitx5-chinese-addons
+    xdg-desktop-portal-gtk mako hyprpolkitagent hyprpaper hypridle fcitx5 fcitx5-chinese-addons google-noto-sans-cjk-fonts
 # wezterm: https://wezterm.org/installation
 # wofi, wlogout, hyprlock, xdg-desktop-portal-hyprland: build from source or via COPR
 ```
